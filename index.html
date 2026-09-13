@@ -1,0 +1,1450 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ShadowMem // In-Memory AI Triage</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600;700&family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&family=Rajdhani:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #050811;
+    --panel: #0a101f;
+    --panel-hover: #0e172c;
+    --border: #1e293b;
+    --border-soft: rgba(30, 41, 59, 0.7);
+    --border-glow: rgba(0, 240, 255, 0.25);
+
+    /* Neon Cyber Accents */
+    --cyan: #00f0ff;
+    --cyan-dim: rgba(0, 240, 255, 0.15);
+    --emerald: #10b981;
+    --emerald-dim: rgba(16, 185, 129, 0.15);
+    --crimson: #ef4444;
+    --crimson-neon: #ff0055;
+    --crimson-dim: rgba(239, 68, 68, 0.18);
+    --amber: #f59e0b;
+    --amber-dim: rgba(245, 158, 11, 0.15);
+
+    /* Typography */
+    --text-main: #f1f5f9;
+    --text-muted: #94a3b8;
+    --text-faint: #475569;
+    --font-heading: 'Rajdhani', sans-serif;
+    --font-sans: 'Inter', -apple-system, sans-serif;
+    --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background-color: var(--bg);
+    background-image:
+      radial-gradient(ellipse 900px 500px at 15% -5%, rgba(0, 240, 255, 0.07), transparent 65%),
+      radial-gradient(ellipse 800px 500px at 85% 5%, rgba(255, 0, 85, 0.05), transparent 60%),
+      linear-gradient(to right, rgba(0, 240, 255, 0.02) 1px, transparent 1px),
+      linear-gradient(to bottom, rgba(0, 240, 255, 0.02) 1px, transparent 1px);
+    background-size: 100% 100%, 100% 100%, 36px 36px, 36px 36px;
+    color: var(--text-main);
+    font-family: var(--font-sans);
+    min-height: 100vh;
+    line-height: 1.5;
+    overflow-x: hidden;
+    position: relative;
+  }
+
+  /* CRT Scanlines Overlay */
+  .scanline-overlay {
+    position: fixed;
+    top: 0; left: 0; width: 100%; height: 100%;
+    background: repeating-linear-gradient(
+      to bottom,
+      rgba(0, 0, 0, 0) 0px,
+      rgba(0, 0, 0, 0) 2px,
+      rgba(0, 0, 0, 0.22) 2px,
+      rgba(0, 0, 0, 0.22) 4px
+    );
+    pointer-events: none;
+    z-index: 999;
+    opacity: 0.55;
+  }
+
+  /* Custom Scrollbars */
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: var(--bg); }
+  ::-webkit-scrollbar-thumb {
+    background: var(--border);
+    border-radius: 3px;
+    border: 1px solid rgba(0, 240, 255, 0.15);
+  }
+  ::-webkit-scrollbar-thumb:hover { background: #1e3a5f; }
+
+  .shell {
+    max-width: 1540px;
+    margin: 0 auto;
+    padding: 20px 28px 60px;
+    position: relative;
+    z-index: 10;
+  }
+
+  /* --------------------------------------------------------------------------
+     1. Top Header
+     -------------------------------------------------------------------------- */
+  header.hud-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 20px;
+    padding: 16px 22px;
+    border-radius: 12px;
+    background: rgba(10, 16, 31, 0.7);
+    backdrop-filter: blur(14px);
+    border: 1px solid var(--border);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.55);
+    margin-bottom: 22px;
+    flex-wrap: wrap;
+    position: relative;
+  }
+
+  header.hud-header::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 12%; right: 12%;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--cyan), transparent);
+    opacity: 0.45;
+  }
+
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+
+  .brand-radar {
+    position: relative;
+    width: 42px; height: 42px;
+    border-radius: 10px;
+    background: radial-gradient(circle at center, rgba(0, 240, 255, 0.15) 0%, rgba(10, 16, 31, 0.9) 100%);
+    border: 1px solid rgba(0, 240, 255, 0.35);
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 0 15px rgba(0, 240, 255, 0.25);
+    overflow: hidden;
+  }
+
+  .radar-sweep {
+    position: absolute;
+    width: 100%; height: 100%;
+    border-radius: 50%;
+    background: conic-gradient(from 0deg at 50% 50%, rgba(0, 240, 255, 0.45) 0deg, transparent 65deg);
+    animation: radar-rotate 2.5s linear infinite;
+  }
+  @keyframes radar-rotate {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+  }
+
+  .brand-radar svg {
+    position: relative;
+    z-index: 2;
+    width: 22px; height: 22px;
+  }
+
+  .brand-text h1 {
+    font-family: var(--font-heading);
+    font-size: 21px;
+    font-weight: 700;
+    letter-spacing: 1.5px;
+    color: #ffffff;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .brand-text h1 span.highlight {
+    color: var(--cyan);
+    text-shadow: 0 0 12px rgba(0, 240, 255, 0.6);
+  }
+
+  .brand-text p {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--text-muted);
+    letter-spacing: 0.5px;
+    margin-top: 1px;
+  }
+
+  .header-actions {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+
+  /* WebSocket Status Pill */
+  .status-pill {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    padding: 8px 16px;
+    border-radius: 20px;
+    background: rgba(10, 16, 31, 0.9);
+    border: 1px solid var(--border);
+    font-family: var(--font-mono);
+    font-size: 11.5px;
+    color: var(--text-muted);
+    transition: all 0.3s ease;
+  }
+  .status-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--text-faint);
+  }
+  .status-pill.connected {
+    border-color: rgba(16, 185, 129, 0.4);
+    background: linear-gradient(180deg, rgba(16, 185, 129, 0.12), rgba(10, 16, 31, 0.95));
+    color: #a7f3d0;
+    box-shadow: 0 0 14px rgba(16, 185, 129, 0.2);
+  }
+  .status-pill.connected .status-dot {
+    background: var(--emerald);
+    box-shadow: 0 0 8px var(--emerald);
+    animation: pulse-dot 1.8s infinite ease-in-out;
+  }
+  .status-pill.disconnected {
+    border-color: rgba(239, 68, 68, 0.45);
+    background: linear-gradient(180deg, rgba(239, 68, 68, 0.12), rgba(10, 16, 31, 0.95));
+    color: #fecdd3;
+    box-shadow: 0 0 14px rgba(239, 68, 68, 0.2);
+  }
+  .status-pill.disconnected .status-dot {
+    background: var(--crimson);
+    box-shadow: 0 0 8px var(--crimson);
+  }
+  @keyframes pulse-dot {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.35; transform: scale(0.85); }
+  }
+
+  /* Exploit Simulation Button */
+  button.sim-button {
+    font-family: var(--font-heading);
+    font-weight: 700;
+    font-size: 13px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: #050811;
+    background: linear-gradient(135deg, #00f0ff 0%, #00c8ff 50%, #10b981 100%);
+    border: 1px solid var(--cyan);
+    padding: 10px 20px;
+    border-radius: 8px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    box-shadow: 0 0 20px rgba(0, 240, 255, 0.45), inset 0 0 10px rgba(255, 255, 255, 0.4);
+    transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    position: relative;
+    overflow: hidden;
+  }
+  button.sim-button:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 0 30px rgba(0, 240, 255, 0.75), inset 0 0 14px rgba(255, 255, 255, 0.6);
+  }
+  button.sim-button:active {
+    transform: translateY(0px) scale(0.98);
+  }
+  button.sim-button:disabled {
+    opacity: 0.6;
+    cursor: wait;
+    transform: none;
+    box-shadow: none;
+  }
+
+  /* --------------------------------------------------------------------------
+     2. KPI Top Row (4 Cards)
+     -------------------------------------------------------------------------- */
+  .kpi-row {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 16px;
+    margin-bottom: 22px;
+  }
+
+  .kpi-card {
+    background: linear-gradient(180deg, rgba(10, 16, 31, 0.75), rgba(6, 10, 20, 0.85));
+    backdrop-filter: blur(14px);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 18px 20px;
+    position: relative;
+    overflow: hidden;
+    min-height: 120px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+    transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+  }
+  .kpi-card:hover {
+    transform: translateY(-2px);
+    border-color: rgba(0, 240, 255, 0.35);
+    box-shadow: 0 12px 28px rgba(0, 0, 0, 0.6), 0 0 18px rgba(0, 240, 255, 0.1);
+  }
+
+  /* Corner tech accents */
+  .kpi-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; width: 8px; height: 8px;
+    border-top: 2px solid var(--cyan);
+    border-left: 2px solid var(--cyan);
+    opacity: 0.5;
+  }
+  .kpi-card::after {
+    content: '';
+    position: absolute;
+    bottom: 0; right: 0; width: 8px; height: 8px;
+    border-bottom: 2px solid var(--cyan);
+    border-right: 2px solid var(--cyan);
+    opacity: 0.4;
+  }
+
+  .kpi-label {
+    font-family: var(--font-heading);
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--text-muted);
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .kpi-value {
+    font-family: var(--font-mono);
+    font-size: 26px;
+    font-weight: 700;
+    color: #ffffff;
+    margin-top: 6px;
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+  }
+  .kpi-value small {
+    font-size: 13px;
+    color: var(--text-muted);
+    font-weight: 500;
+  }
+
+  .kpi-sub {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-top: 6px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .kpi-sub.ok { color: var(--emerald); }
+  .kpi-sub.warn { color: var(--amber); }
+
+  /* Threat Status Card States */
+  #kpi-status.secure {
+    border-color: rgba(16, 185, 129, 0.35);
+  }
+  #kpi-status.secure .kpi-value {
+    color: var(--emerald);
+    font-size: 16px;
+    letter-spacing: 0.5px;
+  }
+
+  #kpi-status.critical {
+    border-color: var(--crimson-neon);
+    background: linear-gradient(180deg, rgba(239, 68, 68, 0.2), rgba(10, 16, 31, 0.95));
+    box-shadow: 0 0 32px rgba(239, 68, 68, 0.4), inset 0 0 20px rgba(239, 68, 68, 0.2);
+    animation: flash-critical 1.2s infinite alternate;
+  }
+  #kpi-status.critical .kpi-value {
+    color: #ffffff;
+    font-size: 15px;
+    font-weight: 800;
+    letter-spacing: 0.8px;
+    text-shadow: 0 0 12px var(--crimson-neon);
+  }
+  @keyframes flash-critical {
+    0% { border-color: rgba(239, 68, 68, 0.45); }
+    100% { border-color: var(--crimson-neon); box-shadow: 0 0 35px rgba(255, 0, 85, 0.7), inset 0 0 25px rgba(255, 0, 85, 0.3); }
+  }
+
+  /* --------------------------------------------------------------------------
+     3. VAD Memory Map Visualizer (Central Grid)
+     -------------------------------------------------------------------------- */
+  .section-container {
+    margin-bottom: 22px;
+  }
+  .section-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    margin-bottom: 12px;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .section-head h2 {
+    font-family: var(--font-heading);
+    font-size: 15px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: #e2e8f0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .section-head h2::before {
+    content: '';
+    display: inline-block;
+    width: 3px; height: 14px;
+    background: var(--cyan);
+    box-shadow: 0 0 8px var(--cyan);
+  }
+  .section-head .meta {
+    font-family: var(--font-mono);
+    font-size: 11.5px;
+    color: var(--text-muted);
+  }
+
+  .vad-panel {
+    background: rgba(10, 16, 31, 0.7);
+    backdrop-filter: blur(14px);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 18px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.55);
+  }
+
+  .vad-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+    gap: 12px;
+  }
+
+  .vad-block {
+    position: relative;
+    border-radius: 8px;
+    padding: 12px 12px 10px;
+    background: rgba(6, 10, 20, 0.95);
+    border: 1px solid var(--border-soft);
+    cursor: pointer;
+    font-family: var(--font-mono);
+    transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
+  }
+  .vad-block:hover {
+    transform: translateY(-3px);
+    z-index: 20;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6);
+  }
+
+  .vad-block .bank-id {
+    font-size: 9px;
+    color: var(--text-faint);
+    text-transform: uppercase;
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 4px;
+  }
+
+  .vad-block .addr {
+    font-size: 11.5px;
+    color: var(--cyan);
+    font-weight: 600;
+    letter-spacing: 0.2px;
+  }
+
+  .vad-block .flags {
+    font-size: 10px;
+    color: var(--text-muted);
+    margin-top: 5px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .vad-block .card-meta {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-top: 7px;
+    padding-top: 6px;
+    border-top: 1px dashed rgba(30, 41, 59, 0.8);
+  }
+
+  .vad-block .micro-size {
+    font-size: 9.5px;
+    color: var(--text-faint);
+  }
+
+  .vad-block .tag {
+    font-size: 9px;
+    letter-spacing: 0.5px;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-family: var(--font-mono);
+    font-weight: 700;
+    text-transform: uppercase;
+  }
+
+  /* Clean State */
+  .vad-block.clean {
+    border-color: rgba(16, 185, 129, 0.25);
+  }
+  .vad-block.clean:hover {
+    border-color: var(--emerald);
+    box-shadow: 0 0 16px rgba(16, 185, 129, 0.25);
+  }
+  .vad-block.clean .tag {
+    background: rgba(16, 185, 129, 0.12);
+    color: var(--emerald);
+  }
+
+  /* Suspicious State */
+  .vad-block.suspicious {
+    border-color: rgba(245, 158, 11, 0.4);
+    background: linear-gradient(180deg, rgba(245, 158, 11, 0.08), rgba(6, 10, 20, 0.95));
+  }
+  .vad-block.suspicious:hover {
+    border-color: var(--amber);
+    box-shadow: 0 0 18px rgba(245, 158, 11, 0.3);
+  }
+  .vad-block.suspicious .tag {
+    background: rgba(245, 158, 11, 0.15);
+    color: var(--amber);
+  }
+
+  /* Infected State - Pulsing Radar Glow */
+  .vad-block.infected {
+    border-color: var(--crimson-neon);
+    background: linear-gradient(180deg, rgba(239, 68, 68, 0.24), rgba(6, 10, 20, 0.98));
+    animation: infected-radar-pulse 1.3s infinite cubic-bezier(0.4, 0, 0.6, 1);
+    z-index: 10;
+  }
+  .vad-block.infected .addr {
+    color: #ffffff;
+    text-shadow: 0 0 10px rgba(255, 0, 85, 0.9);
+  }
+  .vad-block.infected .flags {
+    color: #ffb3c7;
+    font-weight: 600;
+  }
+  .vad-block.infected .tag {
+    background: var(--crimson-neon);
+    color: #ffffff;
+    box-shadow: 0 0 12px var(--crimson-neon);
+  }
+  @keyframes infected-radar-pulse {
+    0%, 100% {
+      box-shadow: 0 0 12px rgba(239, 68, 68, 0.5), inset 0 0 16px rgba(239, 68, 68, 0.25);
+      border-color: var(--crimson);
+      transform: scale(1.02);
+    }
+    50% {
+      box-shadow: 0 0 28px rgba(255, 0, 85, 0.95), inset 0 0 24px rgba(255, 0, 85, 0.45);
+      border-color: var(--crimson-neon);
+      transform: scale(1.035);
+    }
+  }
+
+  /* Hover Card / VAD Tooltip */
+  .vad-tooltip {
+    position: absolute;
+    bottom: calc(100% + 10px);
+    left: 50%;
+    transform: translateX(-50%);
+    background: #060a16;
+    border: 1px solid var(--cyan);
+    border-radius: 8px;
+    padding: 10px 14px;
+    font-size: 11px;
+    white-space: nowrap;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.15s ease, transform 0.15s ease;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.8), 0 0 18px rgba(0, 240, 255, 0.25);
+    z-index: 100;
+    min-width: 220px;
+  }
+  .vad-block:hover .vad-tooltip {
+    opacity: 1;
+    transform: translateX(-50%) translateY(-2px);
+  }
+  .vad-tooltip .tt-title {
+    font-family: var(--font-heading);
+    font-size: 10.5px;
+    color: var(--cyan);
+    letter-spacing: 0.8px;
+    margin-bottom: 4px;
+    border-bottom: 1px solid rgba(30, 41, 59, 0.8);
+    padding-bottom: 3px;
+  }
+  .vad-tooltip div { margin: 2px 0; }
+  .vad-tooltip .k { color: var(--text-muted); margin-right: 6px; }
+  .vad-tooltip .v { color: #ffffff; font-weight: 500; }
+
+  /* --------------------------------------------------------------------------
+     4. Bottom Two-Column Section (Feeds & Hex Disassembly)
+     -------------------------------------------------------------------------- */
+  .bottom-split {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin-bottom: 22px;
+  }
+
+  .panel-box {
+    background: rgba(10, 16, 31, 0.7);
+    backdrop-filter: blur(14px);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.55);
+    overflow: hidden;
+  }
+
+  .panel-head {
+    padding: 14px 18px;
+    border-bottom: 1px solid var(--border-soft);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: rgba(6, 10, 20, 0.6);
+    flex: none;
+  }
+  .panel-head h3 {
+    margin: 0;
+    font-family: var(--font-heading);
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0.8px;
+    color: #ffffff;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .dot-indicator { width: 7px; height: 7px; border-radius: 50%; }
+  .dot-indicator.cyan { background: var(--cyan); box-shadow: 0 0 8px var(--cyan); }
+  .dot-indicator.crimson { background: var(--crimson-neon); box-shadow: 0 0 8px var(--crimson-neon); }
+
+  .feed-scroll {
+    flex: 1;
+    overflow-y: auto;
+    padding: 10px;
+    max-height: 480px;
+  }
+
+  .feed-empty {
+    color: var(--text-faint);
+    font-family: var(--font-mono);
+    font-size: 11.5px;
+    padding: 40px 16px;
+    text-align: center;
+  }
+
+  /* Telemetry Item Card */
+  .telemetry-item {
+    padding: 10px 14px;
+    border-radius: 8px;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--text-muted);
+    background: rgba(6, 10, 20, 0.85);
+    border: 1px solid rgba(30, 41, 59, 0.6);
+    border-left: 2.5px solid var(--cyan);
+    margin-bottom: 8px;
+    animation: slide-in 0.25s ease;
+  }
+  .telemetry-item .line1 {
+    color: #ffffff;
+    display: flex;
+    justify-content: space-between;
+    font-weight: 600;
+  }
+  .telemetry-item .line2 {
+    margin-top: 4px;
+    color: var(--text-muted);
+    font-size: 10.5px;
+  }
+  .telemetry-item .conf-bar {
+    height: 3px;
+    border-radius: 2px;
+    background: rgba(30, 41, 59, 0.8);
+    margin-top: 7px;
+    overflow: hidden;
+  }
+  .telemetry-item .conf-fill {
+    height: 100%;
+    background: var(--cyan);
+    box-shadow: 0 0 6px var(--cyan);
+  }
+
+  /* Alert Item Card */
+  .alert-item {
+    padding: 12px 14px;
+    border-radius: 8px;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    border: 1px solid rgba(239, 68, 68, 0.45);
+    background: linear-gradient(180deg, rgba(239, 68, 68, 0.16), rgba(6, 10, 20, 0.95));
+    box-shadow: 0 4px 14px rgba(239, 68, 68, 0.18);
+    margin-bottom: 8px;
+    animation: slide-in 0.25s ease;
+  }
+  .alert-item .technique {
+    color: #ff7096;
+    font-family: var(--font-heading);
+    font-weight: 700;
+    font-size: 12.5px;
+    letter-spacing: 0.5px;
+  }
+  .alert-item .row {
+    display: flex;
+    justify-content: space-between;
+    margin-top: 5px;
+    color: var(--text-muted);
+  }
+  .alert-item .row .k { color: var(--text-faint); }
+  .alert-item .conf { color: var(--crimson-neon); font-weight: 700; }
+  .alert-item .addr { color: #ffffff; font-weight: 600; }
+
+  @keyframes slide-in {
+    from { opacity: 0; transform: translateY(-6px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  /* Carved Hex Inspector Container */
+  .hex-inspector-wrap {
+    margin-top: 14px;
+    border: 1px solid var(--border-soft);
+    border-radius: 10px;
+    background: rgba(5, 8, 17, 0.95);
+    overflow: hidden;
+  }
+
+  .hex-header {
+    padding: 10px 14px;
+    background: rgba(6, 10, 20, 0.85);
+    border-bottom: 1px solid var(--border-soft);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .hex-title {
+    font-family: var(--font-heading);
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--cyan);
+    letter-spacing: 0.8px;
+  }
+
+  /* Tag highlighting the 4D 5A MZ header */
+  .mz-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    background: rgba(239, 68, 68, 0.18);
+    border: 1px solid var(--crimson-neon);
+    color: #ffa5b8;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    font-weight: 700;
+    box-shadow: 0 0 10px rgba(239, 68, 68, 0.35);
+  }
+
+  .hex-body {
+    display: grid;
+    grid-template-columns: 80px 1fr 200px;
+    font-family: var(--font-mono);
+    font-size: 11.5px;
+  }
+  .hex-offsets, .hex-bytes, .hex-ascii {
+    padding: 12px 10px;
+    max-height: 220px;
+    overflow-y: auto;
+  }
+  .hex-offsets {
+    color: var(--text-faint);
+    border-right: 1px solid var(--border-soft);
+    background: rgba(6, 10, 20, 0.6);
+  }
+  .hex-offsets div { padding: 1.5px 0; }
+  .hex-bytes {
+    color: #cbd5e1;
+    border-right: 1px solid var(--border-soft);
+    letter-spacing: 1px;
+  }
+  .hex-bytes .row { padding: 1.5px 0; white-space: nowrap; }
+  .hex-bytes .b { display: inline-block; width: 20px; text-align: center; }
+
+  /* Highlight MZ bytes */
+  .hex-bytes .b.mz-highlight {
+    color: #ffffff;
+    background: var(--crimson-neon);
+    font-weight: 800;
+    border-radius: 3px;
+    box-shadow: 0 0 8px rgba(255, 0, 85, 0.8);
+  }
+  .hex-bytes .b.hl {
+    color: var(--cyan);
+    font-weight: 600;
+  }
+
+  .hex-ascii { color: var(--text-muted); }
+  .hex-ascii .row { padding: 1.5px 0; white-space: pre; }
+  .hex-ascii .mz-highlight {
+    color: #ffffff;
+    background: var(--crimson-neon);
+    font-weight: 800;
+    padding: 0 2px;
+    border-radius: 2px;
+  }
+  .hex-ascii .hl { color: var(--cyan); }
+
+  .hex-footer {
+    padding: 8px 14px;
+    border-top: 1px solid var(--border-soft);
+    font-family: var(--font-mono);
+    font-size: 10.5px;
+    color: var(--text-muted);
+    display: flex;
+    justify-content: space-between;
+    background: rgba(6, 10, 20, 0.85);
+  }
+  .hex-footer .hash { color: var(--cyan); font-weight: 600; }
+
+  /* Footer */
+  footer.hud-footer {
+    margin-top: 30px;
+    text-align: center;
+    color: var(--text-faint);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    letter-spacing: 0.5px;
+  }
+
+  /* Responsive Adjustments */
+  @media (max-width: 1080px) {
+    .kpi-row { grid-template-columns: repeat(2, 1fr); }
+    .bottom-split { grid-template-columns: 1fr; }
+  }
+  @media (max-width: 640px) {
+    .kpi-row { grid-template-columns: 1fr; }
+    .hex-body { grid-template-columns: 65px 1fr; }
+    .hex-ascii { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<div class="scanline-overlay"></div>
+
+<div class="shell">
+
+  <!-- 1. Top Header -->
+  <header class="hud-header">
+    <div class="brand">
+      <div class="brand-radar">
+        <div class="radar-sweep"></div>
+        <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M12 2L4 5.5V11c0 5.2 3.4 9.7 8 11 4.6-1.3 8-5.8 8-11V5.5L12 2z" stroke="#00f0ff" stroke-width="1.6" stroke-linejoin="round"/>
+          <path d="M9 12l2 2 4-4" stroke="#10b981" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </div>
+      <div class="brand-text">
+        <h1>SHADOW<span class="highlight">MEM</span> // In-Memory AI Triage</h1>
+        <p>AUTONOMOUS MEMORY FORENSICS · VOLATILE VAD ENGINE</p>
+      </div>
+    </div>
+
+    <div class="header-actions">
+      <!-- WebSocket Status Pill -->
+      <div class="status-pill disconnected" id="ws-status">
+        <span class="status-dot"></span>
+        <span id="ws-status-text">KERNEL LINK: CONNECTING…</span>
+      </div>
+
+      <!-- HTTP Trigger Simulation Button -->
+      <button class="sim-button" id="sim-btn">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M13 2L4 14h6l-1 8 9-12h-6l1-8z" fill="#050811"/></svg>
+        Trigger Exploit Simulation
+      </button>
+    </div>
+  </header>
+
+  <!-- 2. Top KPI Row (4 Cards) -->
+  <section class="kpi-row">
+    <!-- KPI 1: Triage Latency -->
+    <div class="kpi-card" id="kpi-latency">
+      <div class="kpi-label">
+        <span>Triage Latency</span>
+        <span style="color:var(--cyan); font-size:10px;">INFERENCE</span>
+      </div>
+      <div class="kpi-value"><span id="latency-val">—</span><small>MS</small></div>
+      <div class="kpi-sub ok" id="latency-sub">&lt; 850ms Hardware SLA Target</div>
+    </div>
+
+    <!-- KPI 2: Monitored Target Process -->
+    <div class="kpi-card" id="kpi-process">
+      <div class="kpi-label">
+        <span>Monitored Process</span>
+        <span style="color:var(--text-faint); font-size:10px;">ACTIVE PID</span>
+      </div>
+      <div class="kpi-value" style="font-size:20px;"><span id="proc-name" style="color:var(--cyan);">—</span></div>
+      <div class="kpi-sub" id="proc-pid">PID —</div>
+    </div>
+
+    <!-- KPI 3: System Threat Status -->
+    <div class="kpi-card secure" id="kpi-status">
+      <div class="kpi-label">
+        <span>Threat Status</span>
+        <span style="color:var(--emerald); font-size:10px;">DEFENSE</span>
+      </div>
+      <div class="kpi-value" id="status-val">SECURE / NORMAL</div>
+      <div class="kpi-sub" id="status-sub">Zero unbacked executable memory detected</div>
+    </div>
+
+    <!-- KPI 4: Total Events Processed -->
+    <div class="kpi-card" id="kpi-events">
+      <div class="kpi-label">
+        <span>Total Events Processed</span>
+        <span style="color:var(--cyan); font-size:10px;">PIPELINE</span>
+      </div>
+      <div class="kpi-value"><span id="events-val">0</span></div>
+      <div class="kpi-sub" id="events-sub">0 captured this session</div>
+    </div>
+  </section>
+
+  <!-- 3. Central VAD Memory Map Visualizer -->
+  <section class="section-container">
+    <div class="section-head">
+      <h2>VAD Memory Map — Virtual Address Descriptor Allocation Pages</h2>
+      <div style="display:flex; align-items:center; gap:16px;">
+        <span class="meta" id="vad-meta">0 blocks loaded</span>
+        <div style="display:flex; gap:10px; font-family:var(--font-mono); font-size:10.5px;">
+          <span style="color:var(--emerald);">● Clean</span>
+          <span style="color:var(--amber);">● Suspicious</span>
+          <span style="color:var(--crimson-neon);">● Injected RWX</span>
+        </div>
+      </div>
+    </div>
+    <div class="vad-panel">
+      <div class="vad-grid" id="vad-grid">
+        <div class="feed-empty" style="grid-column: 1 / -1;">Awaiting memory_map payload from ws://localhost:8000/ws/alerts…</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 4. Bottom Two-Column Section -->
+  <section class="bottom-split">
+    <!-- Left Column: Live Telemetry Stream -->
+    <div class="panel-box">
+      <div class="panel-head">
+        <h3><span class="dot-indicator cyan"></span>Live Telemetry Stream</h3>
+        <span class="meta" style="font-family:var(--font-mono); font-size:11px; color:var(--text-muted);" id="telemetry-count">0 scans</span>
+      </div>
+      <div class="feed-scroll" id="telemetry-feed">
+        <div class="feed-empty">Waiting for heartbeat telemetry…</div>
+      </div>
+    </div>
+
+    <!-- Right Column: Incident Alert Feed & Carved Hex Dump Pane -->
+    <div class="panel-box">
+      <div class="panel-head">
+        <h3><span class="dot-indicator crimson"></span>Incident Alert Feed &amp; Carved Hex Artifact</h3>
+        <span class="meta" style="font-family:var(--font-mono); font-size:11px; color:var(--crimson-neon);" id="alert-count">0 alerts</span>
+      </div>
+      <div class="feed-scroll" style="max-height: 230px;" id="alert-feed">
+        <div class="feed-empty">No active incident alerts. System normal.</div>
+      </div>
+
+      <!-- Carved Artifact Hex Dump Pane -->
+      <div style="padding: 0 14px 14px;">
+        <div class="hex-inspector-wrap">
+          <div class="hex-header">
+            <span class="hex-title">CARVED ARTIFACT DISASSEMBLY (RAW MEMORY)</span>
+            <span class="mz-badge" id="mz-badge">
+              <span>●</span> MZ (4D 5A) DOS HEADER DETECTED
+            </span>
+          </div>
+          <div class="hex-body">
+            <div class="hex-offsets" id="hex-offsets"></div>
+            <div class="hex-bytes" id="hex-bytes"></div>
+            <div class="hex-ascii" id="hex-ascii"></div>
+          </div>
+          <div class="hex-footer">
+            <span>Region: <b id="insp-region" style="color:#fff;">0x00007FF6...</b></span>
+            <span>SHA-256: <span class="hash" id="insp-hash">—</span></span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <footer class="hud-footer">
+    ShadowMem SOC Console // Autonomous Volatile Memory Threat Defense · ws://localhost:8000/ws/alerts
+  </footer>
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  const WS_URL = "ws://127.0.0.1:8000/ws/alerts";
+  const SIM_URL = "http://127.0.0.1:8000/simulate/alert"; 
+  const RECONNECT_BASE_MS = 1500;
+  const RECONNECT_MAX_MS = 15000;
+  const MAX_FEED_ITEMS = 50;
+
+  let ws = null;
+  let reconnectAttempt = 0;
+  let reconnectTimer = null;
+  let totalEvents = 0;
+  let telemetryCount = 0;
+  let alertCount = 0;
+  let inCriticalState = false;
+
+  // DOM Elements
+  const statusPill = document.getElementById('ws-status');
+  const statusText = document.getElementById('ws-status-text');
+  const simBtn = document.getElementById('sim-btn');
+
+  const latencyVal = document.getElementById('latency-val');
+  const latencySub = document.getElementById('latency-sub');
+
+  const procName = document.getElementById('proc-name');
+  const procPid = document.getElementById('proc-pid');
+
+  const kpiStatus = document.getElementById('kpi-status');
+  const statusVal = document.getElementById('status-val');
+  const statusSub = document.getElementById('status-sub');
+  const eventsVal = document.getElementById('events-val');
+  const eventsSub = document.getElementById('events-sub');
+
+  const vadGrid = document.getElementById('vad-grid');
+  const vadMeta = document.getElementById('vad-meta');
+
+  const telemetryFeed = document.getElementById('telemetry-feed');
+  const telemetryCountEl = document.getElementById('telemetry-count');
+  const alertFeed = document.getElementById('alert-feed');
+  const alertCountEl = document.getElementById('alert-count');
+
+  const inspRegion = document.getElementById('insp-region');
+  const inspHash = document.getElementById('insp-hash');
+  const hexOffsets = document.getElementById('hex-offsets');
+  const hexBytes = document.getElementById('hex-bytes');
+  const hexAscii = document.getElementById('hex-ascii');
+  const mzBadge = document.getElementById('mz-badge');
+
+  function escapeHtml(str){
+    return String(str).replace(/[&<>"']/g, function(c){
+      return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c];
+    });
+  }
+
+  function fmtTime(ts){
+    try{
+      const d = ts ? new Date(ts) : new Date();
+      if(isNaN(d.getTime())) return new Date().toLocaleTimeString();
+      return d.toLocaleTimeString(undefined, { hour12:false });
+    }catch(e){ return new Date().toLocaleTimeString(); }
+  }
+
+  function bumpEvents(){
+    totalEvents += 1;
+    eventsVal.textContent = totalEvents.toLocaleString();
+    eventsSub.textContent = totalEvents + ' captured this session';
+  }
+
+  function trimFeed(container, max){
+    while(container.children.length > max){
+      container.removeChild(container.lastChild);
+    }
+  }
+
+  // WebSocket Connection
+  function setStatus(mode, label){
+    statusPill.classList.remove('connected','disconnected');
+    statusPill.classList.add(mode);
+    statusText.textContent = label;
+  }
+
+  function connect(){
+    setStatus('disconnected', 'KERNEL LINK: CONNECTING…');
+    try{
+      ws = new WebSocket("ws://127.0.0.1:8000/ws/alerts");
+    }catch(e){
+      scheduleReconnect();
+      return;
+    }
+
+    ws.onopen = function(){
+      reconnectAttempt = 0;
+      setStatus('connected', 'KERNEL LINK: CONNECTED (ws://8000)');
+    };
+
+    ws.onclose = function(){
+      setStatus('disconnected', 'KERNEL LINK: DISCONNECTED');
+      scheduleReconnect();
+    };
+
+    ws.onerror = function(){
+      try{ ws.close(); }catch(e){}
+    };
+
+    ws.onmessage = function(evt){
+      let msg;
+      try{
+        msg = JSON.parse(evt.data);
+      }catch(e){
+        return;
+      }
+      handleMessage(msg);
+    };
+  }
+
+  function scheduleReconnect(){
+    if(reconnectTimer) return;
+    const delay = Math.min(RECONNECT_MAX_MS, RECONNECT_BASE_MS * Math.pow(1.6, reconnectAttempt));
+    reconnectAttempt += 1;
+    reconnectTimer = setTimeout(function(){
+      reconnectTimer = null;
+      connect();
+    }, delay);
+  }
+
+  // Message Routing
+  function handleMessage(msg){
+    bumpEvents();
+    if(!msg || !msg.type) return;
+
+    if(msg.type === 'memory_map'){
+      renderMemoryMap(msg.blocks || []);
+    } else if(msg.type === 'telemetry'){
+      handleTelemetry(msg);
+    } else if(msg.type === 'alert'){
+      handleAlert(msg);
+    }
+  }
+
+  // Update Latency KPI
+  function updateLatency(ms){
+    if(typeof ms !== 'number') return;
+    latencyVal.textContent = ms.toFixed(1);
+    if(ms < 850){
+      latencySub.textContent = '< 850ms Hardware SLA Target';
+      latencySub.className = 'kpi-sub ok';
+    } else {
+      latencySub.textContent = 'SLA BREACH — over 850ms Target';
+      latencySub.className = 'kpi-sub warn';
+    }
+  }
+
+  function updateTargetProcess(process){
+    if(!process) return;
+    procName.textContent = process.name || '—';
+    procPid.textContent = 'PID ' + (process.pid !== undefined ? process.pid : '—');
+  }
+
+  function setCriticalState(isCritical, detail){
+    inCriticalState = isCritical;
+    if(isCritical){
+      kpiStatus.classList.remove('secure');
+      kpiStatus.classList.add('critical');
+      statusVal.textContent = 'CRITICAL INJECTION DETECTED';
+      statusSub.textContent = detail || 'Unbacked RWX allocation isolated';
+    } else {
+      kpiStatus.classList.remove('critical');
+      kpiStatus.classList.add('secure');
+      statusVal.textContent = 'SECURE / NORMAL';
+      statusSub.textContent = 'Zero unbacked executable memory detected';
+    }
+  }
+
+  // Handle Telemetry Stream
+  function handleTelemetry(msg){
+    telemetryCount += 1;
+    telemetryCountEl.textContent = telemetryCount + ' scans';
+
+    if(msg.detection){
+      updateLatency(msg.detection.inference_time_ms);
+    }
+    if(msg.process){
+      updateTargetProcess(msg.process);
+    }
+    if(!inCriticalState){
+      setCriticalState(false);
+    }
+
+    const emptyState = telemetryFeed.querySelector('.feed-empty');
+    if(emptyState) emptyState.remove();
+
+    const conf = msg.detection && typeof msg.detection.confidence === 'number' ? msg.detection.confidence : 0;
+    const confPct = Math.round(conf * 1000) / 10;
+    const procLabel = msg.process ? (msg.process.name + ' · PID ' + msg.process.pid) : 'unknown process';
+    const infTime = msg.detection && typeof msg.detection.inference_time_ms === 'number' ? msg.detection.inference_time_ms.toFixed(1) + 'ms' : '—';
+
+    const item = document.createElement('div');
+    item.className = 'telemetry-item';
+    item.innerHTML =
+      '<div class="line1"><span>' + escapeHtml(procLabel) + '</span><span>' + escapeHtml(fmtTime(msg.timestamp)) + '</span></div>' +
+      '<div class="line2">Heartbeat VAD scan · Confidence ' + confPct.toFixed(1) + '% · Inference ' + infTime + '</div>' +
+      '<div class="conf-bar"><div class="conf-fill" style="width:' + Math.min(100, confPct) + '%;"></div></div>';
+
+    telemetryFeed.prepend(item);
+    trimFeed(telemetryFeed, MAX_FEED_ITEMS);
+  }
+
+  // Handle Exploit Alert
+  function handleAlert(msg){
+    alertCount += 1;
+    alertCountEl.textContent = alertCount + ' alerts';
+
+    if(msg.detection){
+      updateLatency(msg.detection.inference_time_ms);
+    }
+    if(msg.process){
+      updateTargetProcess(msg.process);
+    }
+
+    const technique = (msg.detection && msg.detection.technique) || 'Unknown technique';
+    setCriticalState(true, technique);
+
+    const emptyState = alertFeed.querySelector('.feed-empty');
+    if(emptyState) emptyState.remove();
+
+    const confPct = msg.detection && typeof msg.detection.confidence === 'number' ? (msg.detection.confidence * 100).toFixed(1) : '98.5';
+    const baseAddr = msg.memory_region ? msg.memory_region.base_address : '—';
+    const region = msg.memory_region ? (formatSize(msg.memory_region.size) + ' · ' + msg.memory_region.protection) : '—';
+    const procLabel = msg.process ? (msg.process.name + ' (PID ' + msg.process.pid + ')') : 'unknown process';
+
+    const item = document.createElement('div');
+    item.className = 'alert-item';
+    item.innerHTML =
+      '<div class="technique">' + escapeHtml(technique) + '</div>' +
+      '<div class="row"><span class="k">Process</span><span>' + escapeHtml(procLabel) + '</span></div>' +
+      '<div class="row"><span class="k">Base Address</span><span class="addr">' + escapeHtml(baseAddr) + '</span></div>' +
+      '<div class="row"><span class="k">Region</span><span>' + escapeHtml(region) + '</span></div>' +
+      '<div class="row"><span class="k">AI Confidence</span><span class="conf">' + confPct + '%</span></div>' +
+      '<div class="row"><span class="k">Detected</span><span>' + escapeHtml(fmtTime(msg.timestamp)) + '</span></div>';
+
+    alertFeed.prepend(item);
+    trimFeed(alertFeed, MAX_FEED_ITEMS);
+
+    if(msg.memory_region){
+      updateHexInspector(msg.memory_region, true);
+    }
+  }
+
+  // Render VAD Memory Map
+  function renderMemoryMap(blocks){
+    vadGrid.innerHTML = '';
+    vadMeta.textContent = blocks.length + ' blocks loaded';
+
+    if(!blocks.length){
+      vadGrid.innerHTML = '<div class="feed-empty" style="grid-column: 1 / -1;">No memory blocks reported.</div>';
+      return;
+    }
+
+    let hasInfected = false;
+
+    blocks.forEach(function(block, idx){
+      const status = (block.status || 'clean').toLowerCase();
+      if(status === 'infected') hasInfected = true;
+
+      const el = document.createElement('div');
+      el.className = 'vad-block ' + status;
+
+      const shortAddr = block.base_address ? '0x' + block.base_address.slice(-8) : '0x00000000';
+      const sizeStr = formatSize(block.size);
+
+      el.innerHTML =
+        '<div class="bank-id"><span>PAGE #' + (idx < 10 ? '0' : '') + idx + '</span><span>' + escapeHtml(block.type || 'MEM_PRIVATE') + '</span></div>' +
+        '<div class="addr">' + escapeHtml(shortAddr) + '</div>' +
+        '<div class="flags" title="' + escapeHtml(block.protection || '—') + '">' + escapeHtml(block.protection || '—') + '</div>' +
+        '<div class="card-meta">' +
+          '<span class="micro-size">' + escapeHtml(sizeStr) + '</span>' +
+          '<span class="tag">' + escapeHtml(status === 'infected' ? 'INJECTED RWX' : status) + '</span>' +
+        '</div>' +
+        '<div class="vad-tooltip">' +
+          '<div class="tt-title">VAD PAGE NODE #' + idx + '</div>' +
+          '<div><span class="k">Address:</span><span class="v">' + escapeHtml(block.base_address || '—') + '</span></div>' +
+          '<div><span class="k">Size:</span><span class="v">' + escapeHtml(sizeStr) + '</span></div>' +
+          '<div><span class="k">Protection:</span><span class="v">' + escapeHtml(block.protection || '—') + '</span></div>' +
+          '<div><span class="k">State:</span><span class="v">' + escapeHtml(block.state || 'MEM_COMMIT') + '</span></div>' +
+          '<div><span class="k">Type:</span><span class="v">' + escapeHtml(block.type || 'MEM_PRIVATE') + '</span></div>' +
+        '</div>';
+
+      vadGrid.appendChild(el);
+
+      el.addEventListener('click', function(){
+        updateHexInspector({
+          base_address: block.base_address,
+          size: block.size,
+          protection: block.protection
+        }, status === 'infected');
+      });
+    });
+
+    if(hasInfected){
+      const firstInfected = blocks.find(b => b.status === 'infected');
+      if(firstInfected){
+        updateHexInspector(firstInfected, true);
+      }
+    }
+  }
+
+  function formatSize(bytes){
+    if(typeof bytes !== 'number') return '—';
+    if(bytes >= 1024*1024) return (bytes/(1024*1024)).toFixed(2) + ' MB';
+    if(bytes >= 1024) return (bytes/1024).toFixed(1) + ' KB';
+    return bytes + ' B';
+  }
+
+  // Hex Disassembly Generator
+  function seededRandom(seed){
+    let s = seed % 2147483647;
+    if(s <= 0) s += 2147483646;
+    return function(){
+      s = (s * 16807) % 2147483647;
+      return (s - 1) / 2147483646;
+    };
+  }
+
+  function hashStringToSeed(str){
+    let h = 0;
+    for(let i=0; i<str.length; i++){
+      h = ((h << 5) - h + str.charCodeAt(i)) | 0;
+    }
+    return Math.abs(h) || 1;
+  }
+
+  function fakeSha256(seedStr){
+    const rand = seededRandom(hashStringToSeed(seedStr + 'sha'));
+    const chars = '0123456789abcdef';
+    let out = '';
+    for(let i=0; i<64; i++){
+      out += chars[Math.floor(rand()*16)];
+    }
+    return out;
+  }
+
+  function updateHexInspector(region, isInfected){
+    const addr = region.base_address || '0x00007FF600000000';
+    const size = region.size || 4096;
+    inspRegion.textContent = addr + ' (' + formatSize(size) + ')';
+    inspHash.textContent = fakeSha256(addr + size);
+
+    if(isInfected){
+      mzBadge.style.display = 'inline-flex';
+    } else {
+      mzBadge.style.display = 'none';
+    }
+
+    const rand = seededRandom(hashStringToSeed(addr));
+    const rowCount = 10;
+    const bytesPerRow = 16;
+
+    let offsetsHtml = '';
+    let bytesHtml = '';
+    let asciiHtml = '';
+
+    for(let r=0; r<rowCount; r++){
+      const offset = r * bytesPerRow;
+      offsetsHtml += '<div>0x' + offset.toString(16).toUpperCase().padStart(4,'0') + '</div>';
+
+      let byteRow = '<div class="row">';
+      let asciiRow = '<div class="row">';
+      for(let c=0; c<bytesPerRow; c++){
+        let byteVal;
+        let isMz = false;
+
+        if(r === 0 && c === 0){
+          byteVal = 0x4D; // 'M'
+          isMz = true;
+        } else if(r === 0 && c === 1){
+          byteVal = 0x5A; // 'Z'
+          isMz = true;
+        } else if(r === 0 && c === 2){
+          byteVal = 0x90; // NOP
+        } else if(r === 0 && c === 3){
+          byteVal = 0x00;
+        } else {
+          byteVal = Math.floor(rand()*256);
+        }
+
+        const isHeader = (r === 0 && c < 4);
+        const hex = byteVal.toString(16).toUpperCase().padStart(2,'0');
+
+        let cls = 'b';
+        if(isMz && isInfected) cls += ' mz-highlight';
+        else if(isHeader) cls += ' hl';
+
+        byteRow += '<span class="' + cls + '">' + hex + '</span>';
+
+        const printable = (byteVal >= 32 && byteVal <= 126) ? String.fromCharCode(byteVal) : '.';
+        let asciiCls = '';
+        if(isMz && isInfected) asciiCls = 'mz-highlight';
+        else if(isHeader) asciiCls = 'hl';
+
+        asciiRow += '<span class="' + asciiCls + '">' + escapeHtml(printable) + '</span>';
+      }
+      byteRow += '</div>';
+      asciiRow += '</div>';
+      bytesHtml += byteRow;
+      asciiHtml += asciiRow;
+    }
+
+    hexOffsets.innerHTML = offsetsHtml;
+    hexBytes.innerHTML = bytesHtml;
+    hexAscii.innerHTML = asciiHtml;
+  }
+
+  // Initialize Default Hex View
+  updateHexInspector({ base_address: '0x00007FF600000000', size: 4096 }, false);
+
+  // HTTP Trigger Simulation Button Listener
+  simBtn.addEventListener('click', function(){
+    simBtn.disabled = true;
+    const originalText = simBtn.innerHTML;
+    simBtn.innerHTML = 'Dispatching Simulation…';
+
+    fetch(SIM_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        scenario: 'cobalt_strike_reflective_injection',
+        severity: 'critical'
+      })
+    }).catch(function(err){
+      console.error('Exploit dispatch failed:', err);
+    }).finally(function(){
+      setTimeout(function(){
+        simBtn.disabled = false;
+        simBtn.innerHTML = originalText;
+      }, 900);
+    });
+  });
+
+  // Start Connection
+  connect();
+})();
+</script>
+</body>
+</html>

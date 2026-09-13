@@ -1,0 +1,25 @@
+﻿# Python Virtual Environments
+.venv/
+venv/
+ENV/
+env/
+
+# Python Bytecode and Cache
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Temporary and Runtime files
+.freebuff/
+*.pid
+
+# Backup files
+*.bak
+
+# Environment / Secrets
+.env
+.env.local
+
+# Operating System Files
+.DS_Store
+Thumbs.db
