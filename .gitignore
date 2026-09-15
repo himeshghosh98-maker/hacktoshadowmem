@@ -1,4 +1,4 @@
-﻿# Python Virtual Environments
+# Python Virtual Environments
 .venv/
 venv/
 ENV/
@@ -12,6 +12,7 @@ __pycache__/
 # Temporary and Runtime files
 .freebuff/
 *.pid
+*.log
 
 # Backup files
 *.bak

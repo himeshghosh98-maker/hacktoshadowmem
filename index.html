@@ -1007,17 +1007,17 @@
   "use strict";
 
   const WS_URL = "ws://127.0.0.1:8000/ws/alerts";
-  const SIM_URL = "http://127.0.0.1:8000/simulate/alert"; 
-  const RECONNECT_BASE_MS = 1500;
-  const RECONNECT_MAX_MS = 15000;
-  const MAX_FEED_ITEMS = 50;
+  const SIM_URL = "http://127.0.0.1:8000/simulate/alert";   
+  const RECONNECT_BASE_MS = 1500; 
+  const RECONNECT_MAX_MS = 15000; 
+  const MAX_FEED_ITEMS = 50; 
 
   let ws = null;
-  let reconnectAttempt = 0;
-  let reconnectTimer = null;
-  let totalEvents = 0;
-  let telemetryCount = 0;
-  let alertCount = 0;
+  let reconnectAttempt = 0;  
+  let reconnectTimer = null;  
+  let totalEvents = 0;  
+  let telemetryCount = 0; 
+  let alertCount = 0; 
   let inCriticalState = false;
 
   // DOM Elements
@@ -1066,15 +1066,15 @@
     }catch(e){ return new Date().toLocaleTimeString(); }
   }
 
-  function bumpEvents(){
-    totalEvents += 1;
-    eventsVal.textContent = totalEvents.toLocaleString();
-    eventsSub.textContent = totalEvents + ' captured this session';
+  function bumpEvents(){ 
+    totalEvents += 1; 
+    eventsVal.textContent = totalEvents.toLocaleString(); 
+    eventsSub.textContent = totalEvents + ' captured this session'; 
   }
 
-  function trimFeed(container, max){
-    while(container.children.length > max){
-      container.removeChild(container.lastChild);
+  function trimFeed(container, max){ 
+    while(container.children.length > max){ 
+      container.removeChild(container.lastChild); 
     }
   }
 
