@@ -115,7 +115,7 @@ def run_detection():
             verdict = "[?] SUSPICIOUS"
             threat_count += 1
         else:
-            verdict = "[✓] CLEAN"
+            verdict = "[OK] CLEAN"
             top_technique = None
 
         # Technique tag for display
@@ -128,7 +128,7 @@ def run_detection():
             print(f"{proc['pid']:<8} {name[:24]:<25} {rwx:<6} {unbacked:<10} {threat_score}%{'':<10} {verdict}{tech_tag}")
 
     if threat_count == 0:
-        print("\n[✓] Scan complete: No active fileless injections detected.")
+        print("\n[+] Scan complete: No active fileless injections detected.")
     else:
         print(f"\n[!] Completed: Detected {threat_count} anomalous process(es).")
 

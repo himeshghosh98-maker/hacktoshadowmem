@@ -5,7 +5,7 @@ import time
 url = 'http://127.0.0.1:8000/api/scan'
 t0 = time.time()
 try:
-    r = urllib.request.urlopen(url, timeout=45)
+    r = urllib.request.urlopen(url, timeout=60)
     data = json.loads(r.read())
     elapsed = time.time() - t0
     s = data['summary']

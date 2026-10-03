@@ -1,6 +1,15 @@
 """
-ShadowMem SOC Dashboard — Backend
-==================================
+ShadowMem SOC Dashboard — Backend (MOCK / TESTING STUB)
+=========================================================
+
+*** THIS IS NOT THE PRODUCTION SERVER ***
+
+This is a standalone mock server for isolated frontend testing without the
+real Win32 memory-scanning engine. It generates SYNTHETIC data only.
+
+The authoritative production server is app.py, started by launch_shadowmem.bat.
+app.py now includes /ws/alerts and /simulate/alert routes migrated from here,
+so this file is only needed for standalone index.html testing.
 
 FastAPI server exposing a WebSocket endpoint (`/ws/alerts`) that streams
 SIMULATED process-memory telemetry and malware-detection alerts for a
@@ -17,7 +26,7 @@ Message types sent over the socket:
   - "memory_map"  -> a simplified virtual memory layout for the visualizer
   - "alert"       -> a detection event (benign heartbeat or simulated attack)
 
-Run:
+Run (standalone, for index.html testing only):
     pip install fastapi uvicorn --break-system-packages
     uvicorn server:app --reload --port 8000
 

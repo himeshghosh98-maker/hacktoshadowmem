@@ -40,8 +40,19 @@ class MEMORY_BASIC_INFORMATION(ctypes.Structure):
 kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
 ntdll = ctypes.WinDLL("ntdll", use_last_error=True)
 
+kernel32.OpenProcess.restype = wintypes.HANDLE
+kernel32.OpenProcess.argtypes = [wintypes.DWORD, wintypes.BOOL, wintypes.DWORD]
+
 kernel32.OpenThread.restype = ctypes.c_void_p
 kernel32.OpenThread.argtypes = [wintypes.DWORD, wintypes.BOOL, wintypes.DWORD]
+
+kernel32.VirtualQueryEx.restype = ctypes.c_size_t
+kernel32.VirtualQueryEx.argtypes = [
+    wintypes.HANDLE, ctypes.c_void_p, ctypes.POINTER(MEMORY_BASIC_INFORMATION), ctypes.c_size_t
+]
+
+kernel32.CloseHandle.restype = wintypes.BOOL
+kernel32.CloseHandle.argtypes = [wintypes.HANDLE]
 
 ntdll.NtQueryInformationThread.restype = ctypes.c_long  # NTSTATUS
 ntdll.NtQueryInformationThread.argtypes = [

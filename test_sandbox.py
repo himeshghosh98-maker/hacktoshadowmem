@@ -8,6 +8,14 @@ by the prototype's scanner, model, and classification system.
 
 import sys
 import os
+
+# Limit BLAS/OpenMP threads BEFORE importing numpy/sklearn to prevent
+# thread accumulation from inflating the test runner's own thread count,
+# which would suppress its threat score below the malicious threshold.
+os.environ['OMP_NUM_THREADS'] = '1'
+os.environ['OPENBLAS_NUM_THREADS'] = '1'
+os.environ['MKL_NUM_THREADS'] = '1'
+
 import ctypes
 from ctypes import wintypes
 
@@ -39,8 +47,8 @@ def test_shellcode_beacon():
         ("Thread in unbacked memory", feats['thread_unbacked_start'] >= 1, f"Got {feats['thread_unbacked_start']}"),
         ("Malicious score (>=70)", result['threat_score'] >= 70, f"Got {result['threat_score']}%"),
         ("Malicious status", result['status'] == 'Malicious (Injected)', f"Got {result['status']}"),
-        ("Correct technique (T1620)", result.get('classification', {}).get('mitre_id') == 'T1620', 
-         f"Got {result.get('classification', {}).get('mitre_id', 'None')}"),
+        ("Correct technique (T1620)", (result.get('classification') or {}).get('mitre_id') == 'T1620', 
+         f"Got {(result.get('classification') or {}).get('mitre_id', 'None')}"),
     ]
     
     print_results(checks, sim)
@@ -65,8 +73,8 @@ def test_reflective_dll():
         ("VAD flips detected", feats['vad_protection_anomaly'] >= 1, f"Got {feats['vad_protection_anomaly']}"),
         ("Unbacked thread", feats['thread_unbacked_start'] >= 1, f"Got {feats['thread_unbacked_start']}"),
         ("Score >= 35 (suspicious)", result['threat_score'] >= 35, f"Got {result['threat_score']}%"),
-        ("Correct technique (T1055.001)", result.get('classification', {}).get('mitre_id') == 'T1055.001',
-         f"Got {result.get('classification', {}).get('mitre_id', 'None')}"),
+        ("Correct technique (T1055.001)", (result.get('classification') or {}).get('mitre_id') == 'T1055.001',
+         f"Got {(result.get('classification') or {}).get('mitre_id', 'None')}"),
     ]
     
     print_results(checks, sim)
@@ -182,7 +190,7 @@ def test_technique_classification():
         model = pickle.load(f)
     result = evaluate_process(feats, model)
     
-    classification = result.get('classification', {})
+    classification = result.get('classification') or {}
     
     print("Technique Classification Fields:")
     print(f"  display_name:    {classification.get('display_name', 'MISSING')}")
@@ -206,16 +214,15 @@ def test_technique_classification():
 
 def print_results(checks, sim):
     """Print test results"""
-    passed = sum(1 for c in checks if c[1])
-    total = len(checks)
+    passed_count = sum(1 for c in checks if c[1])
+    total_count = len(checks)
     
-    print(f"\nResults: {passed}/{total} passed")
-    for check_name, passed, detail in checks:
-        status = "PASS" if passed else "FAIL"
+    print(f"\nResults: {passed_count}/{total_count} passed")
+    for check_name, test_status, detail in checks:
+        status = "PASS" if test_status else "FAIL"
         print(f"  [{status}] {check_name}: {detail}")
     
-    sim.cleanup()
-    return passed == total
+    return passed_count == total_count
 
 
 def main():
@@ -246,20 +253,20 @@ def main():
     print("FINAL RESULTS")
     print("=" * 60)
     
-    passed = sum(1 for _, p in results if p)
-    total = len(results)
+    passed_count = sum(1 for _, p in results if p)
+    total_count = len(results)
     
-    for test_name, passed in results:
-        status = "PASS" if passed else "FAIL"
+    for test_name, test_status in results:
+        status = "PASS" if test_status else "FAIL"
         print(f"  [{status}] {test_name}")
     
-    print(f"\nTotal: {passed}/{total} test suites passed")
+    print(f"\nTotal: {passed_count}/{total_count} test suites passed")
     
-    if passed == total:
+    if passed_count == total_count:
         print("\n*** ALL TESTS PASSED - Sandbox is working correctly ***")
         return 0
     else:
-        print(f"\n*** {total - passed} TESTS FAILED - Review needed ***")
+        print(f"\n*** {total_count - passed_count} TESTS FAILED - Review needed ***")
         return 1
 
 

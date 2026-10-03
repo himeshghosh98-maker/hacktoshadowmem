@@ -243,4 +243,4 @@ html_content = """<!DOCTYPE html>
 with open("presentation_guide.html", "w", encoding="utf-8") as f:
     f.write(html_content)
 
-print("[✓] Updated presentation_guide.html with complete master guide!")
+print("[+] Updated presentation_guide.html with complete master guide!")

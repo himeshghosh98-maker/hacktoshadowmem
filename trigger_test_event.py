@@ -1,4 +1,4 @@
-﻿#!/usr/bin/env python3
+#!/usr/bin/env python3
 """
 Trigger a simulated in-memory attack alert in ShadowMem.
 Posts to the FastAPI /simulate/alert endpoint which broadcasts to all connected WebSockets.
@@ -25,5 +25,6 @@ try:
         print(f"[+] Alert Event ID: {res_data.get('alert_id')}")
 except Exception as e:
     print(f"[-] Error dispatching simulation event: {e}")
-    print("    Ensure server is running: python -m uvicorn server:app --port 8000")
+    print("    Ensure app.py is running: python -m uvicorn app:app --port 8000")
+    print("    (or launch_shadowmem.bat)")
     sys.exit(1)

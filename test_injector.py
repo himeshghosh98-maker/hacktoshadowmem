@@ -1,4 +1,4 @@
-﻿#!/usr/bin/env python3
+#!/usr/bin/env python3
 """
 ================================================================================
 ShadowMem Security Validation Suite - Synthetic In-Memory Injection Harness
@@ -131,6 +131,10 @@ kernel32.CreateThread.argtypes = [
 # BOOL TerminateThread(...) -- teardown for the raw spin thread
 kernel32.TerminateThread.restype = wintypes.BOOL
 kernel32.TerminateThread.argtypes = [wintypes.HANDLE, wintypes.DWORD]
+
+# BOOL CloseHandle(...) -- release kernel object handles after TerminateThread
+kernel32.CloseHandle.restype = wintypes.BOOL
+kernel32.CloseHandle.argtypes = [wintypes.HANDLE]
 
 
 # ------------------------------------------------------------------------------
@@ -297,6 +301,7 @@ def main() -> None:
         try:
             if kernel32.TerminateThread(spin_thread, 0):
                 print("[*] Raw spin thread terminated.")
+                kernel32.CloseHandle(spin_thread)  # close the handle after terminating
         except Exception:
             pass  # already dead or never started
 

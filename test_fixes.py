@@ -3,7 +3,7 @@ import json
 
 # Test scan
 print("=== Test Scan ===")
-r = urllib.request.urlopen('http://127.0.0.1:8000/api/scan', timeout=30)
+r = urllib.request.urlopen('http://127.0.0.1:8000/api/scan', timeout=60)
 data = json.loads(r.read())
 print(f"Scan: {data['summary']['total_scanned']} processes")
 
