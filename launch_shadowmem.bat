@@ -12,8 +12,23 @@ REM variables), so the launched server and the browser URL always agree.
 REM Override with e.g. SET SHADOWMEM_PORT=8765 before launching.
 REM ---------------------------------------------------------------
 
-echo [*] Activating ShadowMem virtual environment...
-call .venv\Scripts\activate.bat
+if not exist ".env" (
+    if exist ".env.example" (
+        echo [*] Initializing .env from .env.example...
+        copy .env.example .env >nul
+    )
+)
+
+if not exist ".venv\Scripts\activate.bat" (
+    echo [*] ShadowMem virtual environment not detected. Creating .venv...
+    python -m venv .venv
+    call .venv\Scripts\activate.bat
+    echo [*] Installing dependencies from requirements.txt...
+    pip install -r requirements.txt
+) else (
+    echo [*] Activating ShadowMem virtual environment...
+    call .venv\Scripts\activate.bat
+)
 
 echo [*] Resolving bind host/port from core/config.py (.env + SHADOWMEM_* env vars)...
 for /f "usebackq delims=" %%p in (`python -c "from core.config import settings; print(settings.port)"`) do set "APP_BIND_PORT=%%p"
