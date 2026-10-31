@@ -1,6 +1,8 @@
 import ctypes
 from ctypes import wintypes
 import psutil
+from concurrent.futures import ThreadPoolExecutor
+import os
 
 from core.config import settings
 
@@ -31,7 +33,7 @@ _PROTECTION_NAMES = {
 }
 
 # Cap on the per-process unbacked-region detail list (memory_map payload);
-# counts are always exact — only the address detail is capped. Bound to the
+# counts are always exact - only the address detail is capped. Bound to the
 # centralized setting so the scanner can never diverge from the memory_map
 # serializer in services/alerts.py, which slices to the same limit.
 _MAX_REGION_DETAILS = settings.max_region_details
@@ -70,6 +72,15 @@ kernel32.VirtualQueryEx.argtypes = [
 kernel32.CloseHandle.restype = wintypes.BOOL
 kernel32.CloseHandle.argtypes = [wintypes.HANDLE]
 
+kernel32.ReadProcessMemory.restype = wintypes.BOOL
+kernel32.ReadProcessMemory.argtypes = [
+    wintypes.HANDLE,
+    ctypes.c_void_p,
+    ctypes.c_void_p,
+    ctypes.c_size_t,
+    ctypes.POINTER(ctypes.c_size_t),
+]
+
 ntdll.NtQueryInformationThread.restype = ctypes.c_long  # NTSTATUS
 ntdll.NtQueryInformationThread.argtypes = [
     ctypes.c_void_p, ctypes.c_long, ctypes.c_void_p,
@@ -100,6 +111,28 @@ def _get_thread_start_address(thread_handle):
     if status != 0:  # NTSTATUS success is 0 (STATUS_SUCCESS)
         return None
     return start_addr.value
+
+
+def read_process_memory_slice(pid: int, address: int, size: int = 256) -> bytes:
+    """Safely reads a slice of virtual memory from target process. Returns raw bytes."""
+    h_process = kernel32.OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, False, pid)
+    if not h_process:
+        return b""
+    buffer = (ctypes.c_char * size)()
+    bytes_read = ctypes.c_size_t(0)
+    try:
+        ok = kernel32.ReadProcessMemory(
+            h_process,
+            ctypes.c_void_p(address),
+            ctypes.byref(buffer),
+            size,
+            ctypes.byref(bytes_read),
+        )
+        if ok and bytes_read.value > 0:
+            return bytes(buffer[:bytes_read.value])
+        return b""
+    finally:
+        kernel32.CloseHandle(h_process)
 
 
 def inspect_process(pid: int) -> dict:
@@ -198,14 +231,20 @@ def inspect_process(pid: int) -> dict:
 
     return features
 
+
 def scan_all_processes():
-    """Returns a list of feature dictionaries for active processes."""
-    results = []
+    """Returns a list of feature dictionaries for active processes using parallel thread pool."""
+    pids = []
     for proc in psutil.process_iter(['pid']):
         try:
-            info = inspect_process(proc.info['pid'])
-            if not info.get("error"):
-                results.append(info)
+            pids.append(proc.info['pid'])
         except (psutil.NoSuchProcess, psutil.AccessDenied):
             continue
+
+    worker_count = min(24, (os.cpu_count() or 4) * 2)
+    results = []
+    with ThreadPoolExecutor(max_workers=worker_count) as executor:
+        for info in executor.map(inspect_process, pids):
+            if info and not info.get("error"):
+                results.append(info)
     return results

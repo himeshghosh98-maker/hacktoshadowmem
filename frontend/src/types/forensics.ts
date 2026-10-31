@@ -5,8 +5,8 @@ export type ProcessStatus =
   | "Clean";
 
 export interface ProcessClassification {
-  id: string;
-  name: string;
+  id?: string;
+  name?: string;
   mechanism?: string;
   detection_signature?: string;
   forensic_indicator?: string;
@@ -15,6 +15,14 @@ export interface ProcessClassification {
   typical_indicators?: string;
   display_name?: string;
   mitre_id?: string;
+  recommended_response?: string;
+}
+
+export interface UnbackedRegion {
+  base_address: number | string;
+  size: number;
+  protection: string;
+  allocation_protect?: string;
 }
 
 export interface ProcessEntry {
@@ -33,7 +41,11 @@ export interface ProcessEntry {
   jit_engine: boolean;
   model_used: boolean;
   classification: ProcessClassification | null;
+  unbacked_regions?: UnbackedRegion[];
   is_isolated?: boolean;
+  attribution?: Record<string, number>;
+  attribution_reasons?: string[];
+  entropy?: number;
 }
 
 export interface ScanSummary {
@@ -87,4 +99,22 @@ export interface ScanHistoryRecord {
   malicious: number;
   suspicious: number;
   threats: number;
+}
+
+export interface HexDumpLine {
+  offset: string;
+  hex_bytes: string;
+  ascii_chars: string;
+}
+
+export interface MemoryDumpResponse {
+  pid: number;
+  name: string;
+  base_address: string;
+  size: number;
+  protection: string;
+  entropy: number;
+  is_shellcode_suspect: boolean;
+  hex_lines: HexDumpLine[];
+  disassembly_hints: string[];
 }

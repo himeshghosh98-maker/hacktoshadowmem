@@ -22,46 +22,46 @@ export function RecentAlertsPanel({
     switch (severity) {
       case "critical":
         return {
-          dot: "bg-threat-malicious shadow-[0_0_6px_#D6453D]",
-          border: "border-threat-malicious/30 hover:border-threat-malicious/60",
-          badge: "bg-threat-malicious/20 text-threat-malicious border-threat-malicious/40",
+          dot: "bg-threat-malicious",
+          border: "border-threat-malicious/25 hover:border-threat-malicious/50",
+          badge: "bg-threat-malicious/10 text-threat-malicious border-threat-malicious/30",
           icon: AlertTriangle,
         };
       case "warn":
         return {
-          dot: "bg-threat-suspicious shadow-[0_0_6px_#E68A2E]",
-          border: "border-threat-suspicious/30 hover:border-threat-suspicious/60",
-          badge: "bg-threat-suspicious/20 text-threat-suspicious border-threat-suspicious/40",
+          dot: "bg-threat-suspicious",
+          border: "border-threat-suspicious/25 hover:border-threat-suspicious/50",
+          badge: "bg-threat-suspicious/10 text-threat-suspicious border-threat-suspicious/30",
           icon: AlertTriangle,
         };
       case "ok":
         return {
-          dot: "bg-threat-clean shadow-[0_0_6px_#3D8B60]",
-          border: "border-threat-clean/30 hover:border-threat-clean/60",
-          badge: "bg-threat-clean/20 text-threat-clean border-threat-clean/40",
+          dot: "bg-threat-clean",
+          border: "border-threat-clean/25 hover:border-threat-clean/50",
+          badge: "bg-threat-clean/10 text-threat-clean border-threat-clean/30",
           icon: CheckCircle,
         };
       default:
         return {
-          dot: "bg-threat-jit shadow-[0_0_6px_#4A7BB0]",
-          border: "border-threat-jit/30 hover:border-threat-jit/60",
-          badge: "bg-threat-jit/20 text-threat-jit border-threat-jit/40",
+          dot: "bg-threat-jit",
+          border: "border-threat-jit/25 hover:border-threat-jit/50",
+          badge: "bg-threat-jit/10 text-threat-jit border-threat-jit/30",
           icon: Info,
         };
     }
   };
 
   return (
-    <div className="p-5 rounded-lg bg-card border border-border shadow-sm flex flex-col justify-between space-y-4">
+    <div className="p-5 rounded-lg bg-card border border-border shadow-xs flex flex-col justify-between space-y-4">
       {/* Header */}
-      <div className="flex items-center justify-between pb-3 border-b border-border/80">
+      <div className="flex items-center justify-between pb-3 border-b border-border">
         <div className="flex items-center gap-2">
           <ShieldAlert className="w-4 h-4 text-threat-malicious" />
           <h3 className="text-sm font-semibold text-textBright tracking-tight">
             Recent Forensic Alerts
           </h3>
           {alerts.length > 0 && (
-            <span className="px-1.5 py-0.2 rounded-full text-[10px] font-mono font-bold bg-threat-malicious/20 text-threat-malicious border border-threat-malicious/30 tracking-wider">
+            <span className="px-2 py-0.5 rounded-full text-xs font-mono font-bold bg-threat-malicious/10 text-threat-malicious border border-threat-malicious/30">
               {alerts.length}
             </span>
           )}
@@ -83,8 +83,8 @@ export function RecentAlertsPanel({
 
       {/* Alerts Stream List */}
       {alerts.length === 0 ? (
-        <div className="h-48 rounded-lg border border-dashed border-border/80 bg-[#FBF8F4] flex flex-col items-center justify-center gap-2 p-6 text-center">
-          <Bell className="w-6 h-6 text-textDim/60" />
+        <div className="h-48 rounded-lg border border-dashed border-border bg-background/50 flex flex-col items-center justify-center gap-2 p-6 text-center">
+          <Bell className="w-6 h-6 text-textDim" />
           <span className="text-sm font-semibold text-textBright font-sans">
             No Active Threat Alerts
           </span>
@@ -101,33 +101,33 @@ export function RecentAlertsPanel({
               <div
                 key={alert.id}
                 onClick={() => onSelectAlert && onSelectAlert(alert)}
-                className={`p-3 rounded-md bg-[#FAF7F2] hover:bg-white border ${style.border} transition-all cursor-pointer space-y-1.5 group shadow-2xs`}
+                className={`p-3 rounded-md bg-background border ${style.border} transition-colors cursor-pointer text-left`}
               >
-                <div className="flex items-start justify-between gap-2">
-                  <div className="flex items-center gap-2">
-                    <span className={`w-2 h-2 rounded-full shrink-0 ${style.dot}`} />
-                    <span className="text-xs font-bold text-textBright group-hover:text-lime transition-colors">
-                      {alert.title}
-                    </span>
-                  </div>
+                <div className="flex items-start gap-2.5">
+                  <span className={`w-2 h-2 rounded-full mt-1.5 shrink-0 ${style.dot}`} />
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-xs font-bold text-textBright truncate font-mono">
+                        {alert.title}
+                      </span>
+                      <span className="text-xs font-mono text-textDim shrink-0">
+                        {alert.timestamp}
+                      </span>
+                    </div>
 
-                  <div className="flex items-center gap-1.5 shrink-0">
+                    <p className="text-xs text-textFog mt-0.5 leading-relaxed">
+                      {alert.message}
+                    </p>
+
                     {alert.technique && (
                       <span
-                        className={`text-[10px] font-mono font-bold px-1.5 py-0.5 rounded border tracking-wider ${style.badge}`}
+                        className={`inline-block mt-2 text-xs font-mono px-2 py-0.5 rounded border ${style.badge}`}
                       >
                         {alert.technique}
                       </span>
                     )}
-                    <span className="text-xs font-mono text-textDim font-medium tnum">
-                      {alert.timestamp}
-                    </span>
                   </div>
                 </div>
-
-                <p className="text-xs font-sans text-textFog leading-relaxed pl-4">
-                  {alert.message}
-                </p>
               </div>
             );
           })}

@@ -16,6 +16,7 @@ from core.config import settings
 from core.logging import logger
 from services.forensics import (
     get_cached_processes,
+    set_cached_processes,
     perform_scan_and_diff,
 )
 
@@ -117,7 +118,7 @@ def build_memory_map(evaluated: Optional[List[Dict[str, Any]]] = None) -> dict:
         malicious = focus_status == "Malicious (Injected)"
         in_threat_set = focus_status in settings.threat_statuses
         unbacked = focus.get("unbacked_regions") or []
-        for i, region in enumerate(unbacked[:settings.max_region_details]):
+        for i, region in enumerate(unbacked[: settings.max_region_details]):
             protection = str(region.get("protection") or "")
             if not in_threat_set:
                 block_status = "clean"
@@ -159,11 +160,12 @@ async def broadcast_scan_updates(
     for proc, prev_status in changes:
         logger.info(
             "WS alert: pid=%s %s score=%s (was %s)",
-            proc.get("pid"), proc.get("name"),
-            proc.get("threat_score"), prev_status or "first scan",
+            proc.get("pid"),
+            proc.get("name"),
+            proc.get("threat_score"),
+            prev_status or "first scan",
         )
         await ws_manager.broadcast(threat_alert_frame(proc, prev_status))
-    # Fresh real memory map after every scan
     await ws_manager.broadcast(build_memory_map())
 
 
@@ -190,7 +192,8 @@ def ensure_scan_ticker() -> None:
 # ---- Simulated Attack Scenarios --------------------------------------------
 SIMULATE_SCENARIOS: Dict[str, Tuple[str, str]] = {
     "cobalt_strike_reflective_injection": (
-        "T1620", "Reflective Code Loading (Cobalt Strike Beacon pattern)",
+        "T1620",
+        "Reflective Code Loading (Cobalt Strike Beacon pattern)",
     ),
     "process_hollowing": ("T1055.012", "Process Hollowing"),
     "dll_injection": ("T1055.001", "Dynamic-link Library Injection"),
@@ -200,6 +203,7 @@ SIMULATE_SEVERITIES = ("critical", "warn", "info")
 SIMULATE_TARGETS = (
     ("rundll32.exe", 7488, r"C:\Windows\System32\rundll32.exe"),
     ("powershell.exe", 6172, r"C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe"),
+    ("spoolsv.exe", 3216, r"C:\Windows\System32\spoolsv.exe"),
 )
 
 
@@ -219,6 +223,63 @@ async def simulate_attack_alert(scenario: str, severity: str) -> dict:
 
     technique_id, technique_name = SIMULATE_SCENARIOS[scenario]
     name, pid, path = random.choice(SIMULATE_TARGETS)
+
+    # Build simulated process record with rich forensic detail
+    simulated_proc: Dict[str, Any] = {
+        "pid": pid,
+        "name": name,
+        "exe": path,
+        "rwx_count": 3,
+        "unbacked_exec_count": 2,
+        "total_rwx_bytes": 131072,
+        "allocated_kb": 128.0,
+        "num_threads": 8,
+        "thread_unbacked_start": 1,
+        "vad_protection_anomaly": 2,
+        "threat_score": 96.5,
+        "status": "Malicious (Injected)",
+        "jit_engine": False,
+        "model_used": True,
+        "classification": {
+            "mitre_id": technique_id,
+            "display_name": technique_name,
+            "short_description": "Adversary injects malicious executable payload into target address space without touching disk.",
+            "typical_indicators": "Unbacked executable memory buffer (PAGE_EXECUTE_READWRITE) with thread entry point mismatch.",
+            "recommended_response": "Suspend active process threads via NtSuspendProcess and isolate network connectivity.",
+        },
+        "unbacked_regions": [
+            {
+                "base_address": 0x7FFA2B400000,
+                "size": 65536,
+                "protection": "PAGE_EXECUTE_READWRITE",
+                "allocation_protect": "PAGE_READWRITE",
+            },
+            {
+                "base_address": 0x7FFA2B420000,
+                "size": 65536,
+                "protection": "PAGE_EXECUTE_READ",
+                "allocation_protect": "PAGE_READWRITE",
+            },
+        ],
+        "attribution": {
+            "thread_unbacked_start": 45.0,
+            "rwx_allocations": 35.0,
+            "vad_protection_anomaly": 20.0,
+        },
+        "attribution_reasons": [
+            "1 active thread initialized directly inside unbacked executable memory (0x7FFA2B400000)",
+            "3 PAGE_EXECUTE_READWRITE allocations detected in private memory (128 KB)",
+            "2 memory permission flip anomalies (PAGE_READWRITE -> PAGE_EXECUTE_READWRITE)",
+        ],
+    }
+
+    # Inject into cached processes list so dashboard reflects it immediately
+    current_cache = list(get_cached_processes())
+    # Remove existing entry if PID already in cache
+    current_cache = [p for p in current_cache if p.get("pid") != pid]
+    current_cache.insert(0, simulated_proc)
+    set_cached_processes(current_cache)
+
     alert = {
         "type": "alert",
         "event_id": str(uuid.uuid4()),
@@ -227,20 +288,23 @@ async def simulate_attack_alert(scenario: str, severity: str) -> dict:
         "process": {"pid": pid, "name": name, "image_path": path},
         "detection": {
             "is_malicious": True,
-            "confidence": 0.95,
+            "confidence": 0.96,
             "classifier": "ShadowMem-v1",
             "technique": f"{technique_id} — {technique_name}",
-            "threat_score": 95.0,
+            "threat_score": 96.5,
             "status": "Malicious (Injected)",
             "scenario": scenario,
         },
         "message": f"Simulated {scenario} detection: {name} (PID {pid}) — {technique_name}",
     }
+
     await ws_manager.broadcast(alert)
-    await ws_manager.broadcast(build_memory_map())
+    await ws_manager.broadcast(build_memory_map(current_cache))
+
     return {
         "status": "broadcast",
         "alert_id": alert["event_id"],
         "scenario": scenario,
         "severity": severity,
+        "process": simulated_proc,
     }

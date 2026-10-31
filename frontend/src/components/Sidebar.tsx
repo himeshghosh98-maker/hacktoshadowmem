@@ -53,8 +53,8 @@ export function Sidebar() {
   return (
     <aside className="w-64 h-screen bg-card border-r border-border flex flex-col shrink-0 select-none z-30">
       {/* Brand & Logo Header */}
-      <div className="h-16 px-5 flex items-center gap-3 border-b border-border/80">
-        <div className="w-9 h-9 rounded-lg bg-lime/10 border border-lime/30 flex items-center justify-center shadow-[0_2px_8px_rgba(232,121,60,0.2)]">
+      <div className="h-16 px-5 flex items-center gap-3 border-b border-border">
+        <div className="w-9 h-9 rounded-lg bg-lime/10 border border-lime/30 flex items-center justify-center">
           <ShieldCheck className="w-5 h-5 text-lime" />
         </div>
         <div>
@@ -62,11 +62,11 @@ export function Sidebar() {
             <span className="font-bold text-base tracking-tight text-textBright font-sans">
               ShadowMem
             </span>
-            <span className="px-1.5 py-0.5 text-[9px] font-mono font-bold bg-lime/20 text-lime rounded border border-lime/30 tracking-wider">
+            <span className="px-1.5 py-0.5 text-xs font-mono font-bold bg-lime/10 text-lime rounded border border-lime/30">
               SOC
             </span>
           </div>
-          <p className="text-[11px] font-medium text-textDim tracking-tight">
+          <p className="text-xs text-textDim tracking-tight">
             Volatile Memory Forensics
           </p>
         </div>
@@ -74,7 +74,7 @@ export function Sidebar() {
 
       {/* Navigation Links */}
       <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
-        <div className="px-2 pb-2 text-[10px] font-mono font-semibold uppercase tracking-wider text-textDim">
+        <div className="px-2 pb-2 text-xs font-mono font-semibold uppercase tracking-wider text-textDim">
           Forensics Navigation
         </div>
         {navItems.map((item) => {
@@ -85,15 +85,14 @@ export function Sidebar() {
             <Link
               key={item.href}
               href={item.href}
-              className={`group relative flex items-center gap-3 px-3 py-2.5 rounded-md text-[13px] font-medium transition-all duration-150 ${
+              className={`group relative flex items-center gap-3 px-3 py-2.5 rounded-md text-xs font-medium transition-colors ${
                 isActive
-                  ? "bg-lime/10 text-lime border border-lime/30 shadow-xs font-semibold"
+                  ? "bg-lime/10 text-lime border border-lime/30 font-semibold"
                   : "text-textFog hover:text-textBright hover:bg-raise border border-transparent"
               }`}
             >
-              {/* Active left indicator pill */}
               {isActive && (
-                <span className="absolute left-0 top-1.5 bottom-1.5 w-1 bg-lime rounded-r shadow-[0_0_8px_rgba(232,121,60,0.4)]" />
+                <span className="absolute left-0 top-1.5 bottom-1.5 w-1 bg-lime rounded-r" />
               )}
               <Icon
                 className={`w-4 h-4 transition-colors ${
@@ -103,7 +102,7 @@ export function Sidebar() {
               <span className="flex-1 font-sans">{item.name}</span>
 
               {item.badge && (
-                <span className="px-1.5 py-0.2 rounded text-[10px] font-mono font-semibold bg-threat-malicious/20 text-threat-malicious border border-threat-malicious/40">
+                <span className="px-1.5 py-0.5 rounded text-xs font-mono font-semibold bg-threat-malicious/10 text-threat-malicious border border-threat-malicious/30">
                   {item.badge}
                 </span>
               )}
@@ -112,22 +111,22 @@ export function Sidebar() {
         })}
       </nav>
 
-      {/* Engine Box */}
+      {/* Engine Status Box */}
       <div className="px-3 py-3">
-        <div className="p-3 rounded-lg bg-card border border-border space-y-2">
-          <div className="text-[10px] font-mono font-semibold uppercase tracking-wider text-textDim">
-            Engine
+        <div className="p-3 rounded-lg bg-background border border-border space-y-2">
+          <div className="text-xs font-mono font-semibold uppercase tracking-wider text-textDim">
+            Forensic Engine
           </div>
           <div className="flex items-center justify-between text-xs font-mono">
-            <span className="text-textDim font-medium">Mode</span>
-            <span className="text-textBright font-semibold text-[11px]">user-mode (VirtualQueryEx)</span>
+            <span className="text-textDim">Traversal</span>
+            <span className="text-textBright font-medium">VirtualQueryEx</span>
           </div>
           <div className="flex items-center justify-between text-xs font-mono">
-            <span className="text-textDim font-medium">Model</span>
-            <span className="text-textBright font-semibold text-[11px]">HistGradientBoosting</span>
+            <span className="text-textDim">Classifier</span>
+            <span className="text-textBright font-medium">Random Forest</span>
           </div>
-          <div className="pt-1.5 border-t border-border/60 flex items-center justify-between text-[11px] font-mono text-textDim">
-            <span>Last scan:</span>
+          <div className="pt-2 border-t border-border flex items-center justify-between text-xs font-mono text-textDim">
+            <span>Last Scan</span>
             <span className="text-lime font-bold">{lastScanTime}</span>
           </div>
         </div>

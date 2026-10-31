@@ -63,6 +63,9 @@ class ProcessEntry(BaseModel):
     classification: Optional[ProcessClassification] = Field(None, description="Associated MITRE technique details")
     unbacked_regions: List[UnbackedRegion] = Field(default_factory=list, description="Raw unbacked region descriptors")
     is_isolated: Optional[bool] = Field(False, description="Whether the process threads are suspended")
+    attribution: Optional[Dict[str, float]] = Field(default_factory=dict, description="Feature attribution percentage breakdown")
+    attribution_reasons: Optional[List[str]] = Field(default_factory=list, description="Forensic explanation rationale bullets")
+    entropy: Optional[float] = Field(None, description="Sampled memory entropy score")
 
 
 class ScanSummary(BaseModel):
@@ -85,3 +88,27 @@ class ScanResponse(BaseModel):
 
     summary: ScanSummary
     processes: List[ProcessEntry]
+
+
+class HexDumpLine(BaseModel):
+    """A single 16-byte formatted line of memory hex inspection."""
+    model_config = ConfigDict(extra="ignore")
+
+    offset: str = Field(..., description="Hex offset within inspected buffer, e.g. '0x0000'")
+    hex_bytes: str = Field(..., description="Space-separated hex byte representation")
+    ascii_chars: str = Field(..., description="Printable ASCII characters with '.' for non-printable")
+
+
+class MemoryDumpResponse(BaseModel):
+    """Response payload for low-level memory region inspection."""
+    model_config = ConfigDict(extra="ignore")
+
+    pid: int = Field(..., description="Target process ID")
+    name: str = Field(..., description="Process name")
+    base_address: str = Field(..., description="Inspected memory base address in hex")
+    size: int = Field(..., description="Inspected buffer size in bytes")
+    protection: str = Field(..., description="Protection flag of the inspected region")
+    entropy: float = Field(..., description="Shannon entropy score (0.0 to 8.0)")
+    is_shellcode_suspect: bool = Field(..., description="Whether bytes match shellcode / payload signatures")
+    hex_lines: List[HexDumpLine] = Field(default_factory=list, description="Formatted hex dump lines")
+    disassembly_hints: List[str] = Field(default_factory=list, description="Forensic pattern hints observed in memory")
