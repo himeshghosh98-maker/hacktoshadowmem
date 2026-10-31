@@ -9,7 +9,6 @@ import {
   Loader2,
   ShieldCheck,
   ShieldAlert,
-  Percent,
   CheckCircle2,
   Layers,
   Activity,
@@ -120,7 +119,7 @@ export default function AnalyticsPage() {
     const mal = processes.filter((p) => p.status === "Malicious (Injected)");
     const susp = processes.filter((p) => p.status === "Suspicious");
     const jit = processes.filter((p) => p.jit_engine);
-    const clean = processes.filter((p) => p.status === "Clean (Uninfected)");
+    const clean = processes.filter((p) => p.status === "Clean");
 
     return [
       {
@@ -193,7 +192,7 @@ export default function AnalyticsPage() {
       </div>
 
       {/* KPI Metric Cards */}
-      <div className={`grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 ${isCompact ? "gap-2.5" : "gap-4"}`}>
+      <div className={`grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 ${isCompact ? "gap-2.5" : "gap-4"}`}>
         <div className={`${isCompact ? "p-2.5 space-y-1" : "p-4 space-y-2"} rounded-lg bg-card border border-border border-l-4 border-l-lime shadow-xs`}>
           <div className="flex items-center justify-between text-xs font-semibold text-textFog tracking-wide uppercase font-mono">
             <span>Overall Clear Rate</span>
@@ -207,38 +206,6 @@ export default function AnalyticsPage() {
           </div>
           <div className="text-xs font-mono font-medium text-textDim">
             {hasScanned ? `${cleared} / ${total} processes benign` : "Awaiting scan audit"}
-          </div>
-        </div>
-
-        <div className={`${isCompact ? "p-2.5 space-y-1" : "p-4 space-y-2"} rounded-lg bg-card border border-border border-l-4 border-l-blue-500 shadow-xs`}>
-          <div className="flex items-center justify-between text-xs font-semibold text-textFog tracking-wide uppercase font-mono">
-            <span>ML Detection Accuracy</span>
-            <div className="flex items-center gap-1.5">
-              {hasScanned && <LastUpdated timestamp={lastUpdated} />}
-              <Percent className="w-4 h-4 text-blue-500" />
-            </div>
-          </div>
-          <div className={`${isCompact ? "text-2xl" : "text-3xl"} font-extrabold font-mono text-blue-500 tracking-tight`}>
-            99.4%
-          </div>
-          <div className="text-xs font-mono font-medium text-textDim">
-            Random Forest 7-Feature Model
-          </div>
-        </div>
-
-        <div className={`${isCompact ? "p-2.5 space-y-1" : "p-4 space-y-2"} rounded-lg bg-card border border-border border-l-4 border-l-threat-suspicious shadow-xs`}>
-          <div className="flex items-center justify-between text-xs font-semibold text-textFog tracking-wide uppercase font-mono">
-            <span>False Positive Estimate</span>
-            <div className="flex items-center gap-1.5">
-              {hasScanned && <LastUpdated timestamp={lastUpdated} />}
-              <ShieldCheck className="w-4 h-4 text-threat-suspicious" />
-            </div>
-          </div>
-          <div className={`${isCompact ? "text-2xl" : "text-3xl"} font-extrabold font-mono text-textBright tracking-tight`}>
-            &lt; 0.2%
-          </div>
-          <div className="text-xs font-mono font-medium text-textDim">
-            Verified across benign JIT heuristics
           </div>
         </div>
 

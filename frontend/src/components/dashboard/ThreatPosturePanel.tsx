@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { ShieldCheck, ShieldAlert, CheckCircle2, Target, Percent } from "lucide-react";
+import { ShieldCheck, ShieldAlert, CheckCircle2 } from "lucide-react";
 import { ScanSummary } from "@/types/forensics";
 import { LastUpdated } from "@/components/LastUpdated";
 
@@ -37,7 +37,7 @@ export function ThreatPosturePanel({
               Posture Assessment Pending
             </h4>
             <p className="text-xs font-sans text-textFog max-w-xs leading-relaxed">
-              Baseline system integrity score, false positive probability, and threat containment status calculate on first memory scan.
+              Baseline system integrity score and threat containment status calculate on first memory scan.
             </p>
           </div>
         </div>
@@ -129,26 +129,6 @@ export function ThreatPosturePanel({
 
           <div className="p-2.5 rounded bg-card border border-border shadow-xs">
             <div className="flex items-center gap-1.5 text-xs font-sans text-textFog font-medium">
-              <Target className="w-3.5 h-3.5 text-lime" />
-              <span>Detection Accuracy</span>
-            </div>
-            <div className="text-lg font-bold font-mono text-lime mt-0.5">
-              99.4%
-            </div>
-          </div>
-
-          <div className="p-2.5 rounded bg-card border border-border shadow-xs">
-            <div className="flex items-center gap-1.5 text-xs font-sans text-textFog font-medium">
-              <Percent className="w-3.5 h-3.5 text-textFog" />
-              <span>False Positive Est.</span>
-            </div>
-            <div className="text-lg font-bold font-mono text-textBright mt-0.5">
-              &lt; 0.2%
-            </div>
-          </div>
-
-          <div className="p-2.5 rounded bg-card border border-border shadow-xs">
-            <div className="flex items-center gap-1.5 text-xs font-sans text-textFog font-medium">
               <ShieldAlert className="w-3.5 h-3.5 text-threat-malicious" />
               <span>Threat Level</span>
             </div>
@@ -165,7 +145,7 @@ export function ThreatPosturePanel({
 
       {/* Advisory Bar */}
       <div className="p-2.5 rounded bg-[#F8F5F0] border border-border text-xs font-mono text-textFog flex items-center justify-between">
-        <span>Model: {summary.model_loaded ? "7-Feature Random Forest" : "Heuristic VAD Fallback"}</span>
+        <span>Model: {summary.model_loaded ? "HistGradientBoosting (7 features)" : "Heuristic Fallback"}</span>
         <span className="text-lime font-bold">SOC Active</span>
       </div>
     </div>

@@ -53,10 +53,22 @@ function notifyConnection(success: boolean, error?: unknown) {
   }
 }
 
+export interface SimulateAlertRequest {
+  scenario?: string;
+  severity: "critical" | "warn" | "info";
+}
+
+export interface SimulateAlertResponse {
+  status: string;
+  alert_id: string;
+  scenario: string;
+  severity: string;
+}
+
 export async function fetchScan(): Promise<ScanResponse> {
   const base = getApiBaseUrl();
   try {
-    const res = await fetch(`${base}/api/scan`, {
+    const res = await fetch(`${base}/api/v1/scan`, {
       method: "GET",
       headers: {
         Accept: "application/json",
@@ -77,6 +89,11 @@ export async function fetchScan(): Promise<ScanResponse> {
 
     const data = (await res.json()) as ScanResponse;
     notifyConnection(true);
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(
+        new CustomEvent("shadowmem:scan", { detail: { timestamp: Date.now() } })
+      );
+    }
     return data;
   } catch (err) {
     notifyConnection(false, err);
@@ -89,13 +106,14 @@ export async function isolateProcess(
   reason: string = ""
 ): Promise<IsolateResponse> {
   const base = getApiBaseUrl();
-  const query = reason ? `?reason=${encodeURIComponent(reason)}` : "";
   try {
-    const res = await fetch(`${base}/api/isolate/${pid}${query}`, {
+    const res = await fetch(`${base}/api/v1/isolate/${pid}`, {
       method: "POST",
       headers: {
+        "Content-Type": "application/json",
         Accept: "application/json",
       },
+      body: JSON.stringify({ reason }),
     });
 
     const data = (await res.json()) as IsolateResponse;
@@ -114,7 +132,7 @@ export async function isolateProcess(
 export async function resumeProcess(pid: number): Promise<IsolateResponse> {
   const base = getApiBaseUrl();
   try {
-    const res = await fetch(`${base}/api/resume/${pid}`, {
+    const res = await fetch(`${base}/api/v1/resume/${pid}`, {
       method: "POST",
       headers: {
         Accept: "application/json",
@@ -137,7 +155,7 @@ export async function resumeProcess(pid: number): Promise<IsolateResponse> {
 export async function fetchAudit(): Promise<AuditResponse> {
   const base = getApiBaseUrl();
   try {
-    const res = await fetch(`${base}/api/audit`, {
+    const res = await fetch(`${base}/api/v1/audit`, {
       method: "GET",
       headers: {
         Accept: "application/json",
@@ -154,6 +172,39 @@ export async function fetchAudit(): Promise<AuditResponse> {
     return data;
   } catch (err) {
     notifyConnection(false, err);
+    throw err;
+  }
+}
+
+export async function simulateAlert(
+  scenario: string = "cobalt_strike_reflective_injection",
+  severity: "critical" | "warn" | "info" = "critical"
+): Promise<SimulateAlertResponse> {
+  const base = getApiBaseUrl();
+  try {
+    const res = await fetch(`${base}/api/v1/simulate/alert`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "application/json",
+      },
+      body: JSON.stringify({ scenario, severity }),
+    });
+
+    if (!res.ok) {
+      let errorDetail = `Simulation failed with HTTP ${res.status}`;
+      try {
+        const errJson = await res.json();
+        if (errJson.detail) errorDetail = errJson.detail;
+      } catch {
+        // ignore
+      }
+      throw new Error(errorDetail);
+    }
+
+    return (await res.json()) as SimulateAlertResponse;
+  } catch (err) {
+    console.error("Simulation error:", err);
     throw err;
   }
 }
@@ -181,7 +232,7 @@ export function connectAlertsWebSocket(
           ? "127.0.0.1:8000"
           : window.location.host || "127.0.0.1:8000";
 
-      const wsUrl = `${protocol}//${host}/ws/alerts`;
+      const wsUrl = `${protocol}//${host}/api/v1/ws/alerts`;
       ws = new WebSocket(wsUrl);
 
       ws.onopen = () => {
@@ -194,6 +245,9 @@ export function connectAlertsWebSocket(
         if (isUnmounted) return;
         try {
           const payload = JSON.parse(event.data) as WebSocketAlertPayload;
+          // Only alert frames belong in the alerts feed. memory_map frames
+          // (live-map payload) and other frame types must not surface here.
+          if (payload.type && payload.type !== "alert") return;
           const isCritical = payload.severity === "critical" || payload.detection?.is_malicious;
           const alertItem: AlertItem = {
             id: payload.event_id || `ws-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,

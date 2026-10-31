@@ -180,10 +180,10 @@ cover_rows = [
     ["OS target", "Windows only (VirtualQueryEx / OpenProcess / VirtualAlloc); admin rights required for system processes"],
     ["Repo state", "Local folder, no git history - status below inferred entirely from the code present on disk"],
     ["Scale", "{n} Python/HTML source files, ~{loc:,} lines of code".format(
-        n=len([f for f in ["app.py", "server.py", "memoryscanner.py", "train_model.py",
+        n=len([f for f in ["app.py", "tests/mocks/server.py", "memoryscanner.py", "train_model.py",
                            "detecter.py", "test_injector.py", "trigger_test_event.py",
                            "make_guide.py", "index.html"] if os.path.exists(f)]),
-        loc=sum(_line_count(f) for f in ["app.py", "server.py", "memoryscanner.py",
+        loc=sum(_line_count(f) for f in ["app.py", "tests/mocks/server.py", "memoryscanner.py",
                                          "train_model.py", "detecter.py", "test_injector.py",
                                          "trigger_test_event.py", "make_guide.py", "index.html"])),
     ],
@@ -218,10 +218,11 @@ story += bullets([
     "without ever injecting into another process or executing untrusted code.",
 ])
 story.append(P(
-    "There are two parallel stacks in the repo: a REAL stack (memoryscanner.py -> app.py + "
-    "embedded dashboard, scored by the trained model) and a DEMO stack (server.py + "
-    "index.html, streaming synthetic WebSocket telemetry/alerts for UI showcase). They are "
-    "not yet merged - that is the single biggest architectural TODO (Section 6).",
+    "The repo previously ran two parallel stacks: a REAL stack (memoryscanner.py -> app.py "
+    "+ embedded dashboard, scored by the trained model) and a DEMO stack (server.py + "
+    "index.html, streaming synthetic WebSocket telemetry/alerts for UI showcase). The "
+    "WebSocket demo stack has now been successfully unified into app.py, and server.py is "
+    "retired to tests/mocks/ as a test-only mock fixture (complete - see Section 5).",
 ))
 
 # -- 2. File inventory --------------------------------------------------------
@@ -262,7 +263,7 @@ inventory_rows = [
         "process, stages NOP sled + RET (never executes it), spawns a worker thread, cleans "
         "up with VirtualFree on Ctrl+C",
         "Done - Windows-only, needs admin for best scan visibility"),
-    _fl("server.py",
+    _fl("tests/mocks/server.py",
         "SEPARATE demo FastAPI app: WebSocket /ws/alerts streams synthetic telemetry/alerts/"
         "memory maps; POST /simulate/alert for manual triggers; CORS wide open; 'XGBoost' is "
         "a stubbed confidence generator",
@@ -313,23 +314,23 @@ story.append(P(
     "(8*RWX + 15*unbacked + MB + 0.2*threads, capped at 100). Results are sorted by score and "
     "returned with a summary block; the embedded dashboard polls this endpoint on demand.",
 ))
-story.append(P("3.2 Demo stack (server.py + index.html)", S_H2))
+story.append(P("3.2 WebSocket streaming (hosted in app.py; server.py = mock fixture)", S_H2))
 story.append(P(
-    "A fully synthetic WebSocket pipeline: /ws/alerts loops every 1.5-3.0 s, broadcasting "
-    "benign 'telemetry' heartbeats ~85% of the time and randomized 'alert' + infected "
-    "'memory_map' frames otherwise; POST /simulate/alert (called by trigger_test_event.py) "
-    "broadcasts a specific scenario (cobalt_strike_reflective_injection, process_hollowing, "
-    "dll_injection) mapped to MITRE IDs (T1620, T1055.012, T1055.001). Payloads imitate a "
-    "real EDR schema: host, process (pid/ppid/path), memory_region, vad_info, peb_info, "
-    "detection{is_malicious, confidence, classifier, inference_time_ms}. index.html renders "
-    "this as an attack-map dashboard. No real memory is read anywhere in this stack.",
+    "WebSocket streaming -- live alerts and memory_map broadcasts -- is now hosted entirely "
+    "in app.py: the periodic scan ticker and POST /simulate/alert push alert frames and "
+    "fresh memory_map frames over /ws/alerts from real scan data. server.py is no longer a "
+    "live server; it is preserved only as a mock fixture under tests/mocks/ for testing "
+    "purposes, serving synthetic telemetry, memory_map, and alert frames with MITRE-tagged "
+    "scenarios on port 8082 so it can never collide with app.py on "
+    "8000.",
 ))
-story.append(P("3.3 Intended (not yet built) unified architecture", S_H2))
+story.append(P("3.3 Completed unified architecture", S_H2))
 story.append(P(
-    "One FastAPI app exposing both the real scanner results and a WebSocket feed so the "
-    "richer index.html UI could show live real data. Currently app.py has a rich UI but "
-    "request/response polling, and server.py has streaming but fake data - merging them is "
-    "the top structural TODO (Section 6, item A).",
+    "One FastAPI app now exposes both the real scanner results and the WebSocket feed: "
+    "app.py handles real scan diffing (threat transitions between scans) and broadcasts "
+    "real memory_map frames from live region data over /ws/alerts, alongside its rich "
+    "dashboard UI. The former server.py streaming role lives in app.py; server.py is "
+    "retired to tests/mocks/ as a test-only mock (complete - see Section 5).",
 ))
 
 # -- 4. Component deep-dives ---------------------------------------------------
@@ -443,7 +444,8 @@ done_rows = [
     ["SOC dashboard (real)", "Embedded single-file UI: scan button, animated states, stat cards, filters, search, dossier modal, telemetry ticker, JSON export"],
     ["CLI detector", "detecter.py table output for quick terminal demos and validation"],
     ["Safe live-fire demo", "test_injector.py creates genuine RWX footprint safely; documented baseline-scan / inject / detect / teardown sequence"],
-    ["Synthetic streaming demo", "server.py + index.html: WebSocket telemetry/alert/memory-map protocol with MITRE-tagged scenarios and manual trigger script"],
+    ["WebSocket streaming", "Now in app.py: /ws/alerts broadcasts live alerts and memory_map frames from real scan data, with MITRE-tagged simulate scenarios (server.py retired to tests/mocks/ as the mock reference)"],
+    ["Backend unification (complete)", "The former P0 'unify the two backends' backlog item is done: app.py hosts /ws/alerts and the memory_map visualizer fed by real scans, server.py retired to tests/mocks/ as a test-only mock - no port conflict"],
     ["Launcher + docs", "launch_shadowmem.bat one-click start; make_guide.py generates a full presentation/viva master guide (speaker scripts, Q&A, demo sequence)"],
 ]
 story.append(make_table(["Achieved", "Detail"], done_rows, [1.7 * inch, 5.2 * inch]))
@@ -461,11 +463,6 @@ todo_rows = [
      "NtQueryInformationThread (or psutil's threads with start-address via ctypes) to resolve "
      "thread start addresses against mapped regions, and either ETW/kernel telemetry or "
      "periodic re-protection diffing to detect RW->RX/RWX transitions."],
-    ["P0", "B. Unify the two backends",
-     "app.py (real data, rich UI, polling) and server.py (synthetic WebSocket, richer map UI) "
-     "are separate apps that even conflict on port 8000. Merge: add /ws/alerts to app.py fed "
-     "by real scan data, port the memory-map visualizer into the embedded dashboard, retire "
-     "or clearly demote server.py to demo-only."],
     ["P0", "C. Fix doc-vs-code mismatches",
      "make_guide.py's viva guide claims SMOTE and XGBoost; the pipeline actually uses "
      "class_weight balancing with HistGradientBoosting/RandomForest, and claims MZ/PE header "
@@ -538,8 +535,8 @@ run_rows = [
      "Terminal table; run as admin for maximum process coverage"],
     ["Live-fire demo", "Terminal 1: python test_injector.py (keep running). Terminal 2: python detecter.py (or dashboard scan). Expect the injector PID flagged MALICIOUS.",
      "Ctrl+C the injector, re-scan, threat clears"],
-    ["Demo stack", "python -m uvicorn server:app --reload --port 8000 + open index.html; then python trigger_test_event.py",
-     "Must NOT run at the same time as app.py on the same port"],
+    ["Mock demo stack", "cd tests/mocks && python -m uvicorn server:app --port 8082; open index.html; then python trigger_test_event.py",
+     "Test-only mock - do not run alongside app.py on the same port"],
 ]
 story.append(make_table(["Task", "Command", "Notes"], run_rows,
                         [1.1 * inch, 3.3 * inch, 2.5 * inch]))
@@ -557,10 +554,10 @@ fact_rows = [
     ["Verdict thresholds", "Malicious >= 70.0 | Suspicious >= 35.0 | Clean < 35.0 | JIT engines capped at 25.0"],
     ["Model contract", "shadowmem_model.pkl = sklearn Pipeline(RobustScaler, HistGradientBoostingClassifier); call predict_proba([[7 features]]); malicious prob = column[-1] * 100"],
     ["app.py endpoints", "GET / (embedded dashboard HTML) | GET /api/scan -> {summary{total_scanned, anomalies_detected, malicious_count, suspicious_count, jit_engine_count, clean_count, system_posture, model_loaded}, processes[{pid, name, rwx_count, unbacked_exec_count, total_rwx_bytes, allocated_kb, num_threads, threat_score, status, jit_engine, model_used}]}"],
-    ["server.py endpoints", "GET / (info JSON) | POST /simulate/alert {scenario, severity} | WS /ws/alerts (telemetry | memory_map | alert frames)"],
+    ["server.py (mock fixture)", "Not a live server: preserved only under tests/mocks/ for testing; WebSocket streaming (live alerts and memory_map broadcasts) is hosted entirely in app.py"],
     ["Process record (scanner)", "{pid, name, rwx_count, unbacked_exec_count, total_rwx_bytes, num_threads, error}"],
     ["JIT allowlist", "chrome, msedge, firefox, code, discord, antigravity, slack, teams, electron, brave, opera, vivaldi (.exe)"],
-    ["Ports", "Both stacks default 8000 - conflict to resolve during unification (6B)"],
+    ["Ports", "app.py = 8000 (primary/production) | tests/mocks/server.py = 8082 (test mock only, no conflict)"],
     ["Key UI element IDs (app.py)", "scanBtn, exportReportBtn, resultsBody, forensicModal, modalIsolateBtn, modalDumpBtn, stringsDrawer, kernelTicker, radarCanvas, postureGaugeCircle"],
     ["Win32 constants in play", "PAGE_EXECUTE_READWRITE 0x40, PAGE_EXECUTE_READ 0x20, MEM_COMMIT 0x1000, MEM_PRIVATE 0x20000, PROCESS_QUERY_INFORMATION 0x0400, PROCESS_VM_READ 0x0010"],
     ["Trainer entry points", "train_model.build_synthetic_dataset(n_total=6000), build_pipeline(model_type='hgb'|'rf'), evaluate_cv, report_feature_importance, main()"],

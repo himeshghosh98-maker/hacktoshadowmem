@@ -13,18 +13,19 @@ import {
   Loader2,
 } from "lucide-react";
 import { AlertItem, ProcessEntry } from "@/types/forensics";
-import { connectAlertsWebSocket, fetchScan } from "@/lib/api";
+import { fetchScan, simulateAlert } from "@/lib/api";
 import { ProcessDossierModal } from "@/components/dashboard/ProcessDossierModal";
 import { LastUpdated } from "@/components/LastUpdated";
 import { useNotifications } from "@/context/NotificationsContext";
+import { useConnection } from "@/context/ConnectionContext";
 
 type SeverityFilter = "ALL" | "critical" | "warn" | "info";
 
 export default function AlertsPage() {
   const { alerts, addAlert, clearAlerts } = useNotifications();
+  const { wsConnected, subscribeAlerts } = useConnection();
   const [lastUpdated, setLastUpdated] = useState<number | null>(null);
   const [processes, setProcesses] = useState<ProcessEntry[]>([]);
-  const [wsConnected, setWsConnected] = useState(false);
   const [activeFilter, setActiveFilter] = useState<SeverityFilter>("ALL");
   const [searchQuery, setSearchQuery] = useState("");
   const [isSimulating, setIsSimulating] = useState(false);
@@ -50,7 +51,7 @@ export default function AlertsPage() {
             message: `PID ${p.pid} scored ${p.threat_score.toFixed(1)}% threat confidence. ${
               p.classification?.name
                 ? `Technique: ${p.classification.name}.`
-                : "VAD protection anomalies detected."
+                : "Protection anomalies detected."
             }`,
             severity: p.status === "Malicious (Injected)" ? "critical" : "warn",
             timestamp: new Date().toLocaleTimeString([], {
@@ -66,26 +67,21 @@ export default function AlertsPage() {
       })
       .catch(() => {});
 
-    const disconnect = connectAlertsWebSocket(
-      (newAlert) => {
-        addAlert(newAlert);
-        setLastUpdated(Date.now());
-      },
-      (connected) => {
-        setWsConnected(connected);
-      }
-    );
+    const unsubscribe = subscribeAlerts((newAlert) => {
+      addAlert(newAlert);
+      setLastUpdated(Date.now());
+    });
 
     return () => {
-      disconnect();
+      unsubscribe();
     };
-  }, [addAlert]);
+  }, [addAlert, subscribeAlerts]);
 
-  // Trigger simulated threat alert via POST /simulate/alert
+  // Trigger simulated threat alert via POST /api/v1/simulate/alert
   const handleSimulateAlert = async () => {
     setIsSimulating(true);
     try {
-      await fetch("/simulate/alert", { method: "POST" });
+      await simulateAlert("cobalt_strike_reflective_injection", "critical");
     } catch (err) {
       console.error("Simulation error:", err);
     } finally {

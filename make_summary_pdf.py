@@ -111,7 +111,7 @@ arch_rows = [
     ["ML Model", "train_model.py -> shadowmem_model.pkl", "Trains a 9-class HistGradientBoostingClassifier (RobustScaler + HGB pipeline) on synthetic forensic data. 7-feature vector: [rwx_count, unbacked_exec_count, total_rwx_bytes, num_threads, thread_unbacked_start, is_known_jit_parent, vad_protection_anomaly]. Includes canary sanity gates before saving."],
     ["Detection Engine", "app.py (evaluate_process)", "Feeds scanner output into the model, applies JIT allowlist suppression (browsers/Electron capped at 25%), managed runtime path validation (PowerShell only if under C:\\Windows), and classifies into Clean / Suspicious (>=35%) / Malicious (>=70%)."],
     ["SOC Dashboard", "app.py (embedded HTML) + index.html", "Cyberpunk-styled web UI with live scan results, threat posture gauge, VAD radar scope, process table with isolate/resume controls, and export-to-JSON."],
-    ["WebSocket Demo", "server.py + index.html", "Synthetic telemetry/alert streaming for UI showcase (not real memory reads)."],
+    ["WebSocket Streaming", "app.py (mock: tests/mocks/server.py)", "Live alerts and memory_map broadcasts are hosted entirely in app.py; server.py is preserved only as a mock fixture under tests/mocks/ for testing purposes, not a live server."],
 ]
 story.append(make_table(["Layer", "File(s)", "Role"], arch_rows, [1.1*inch, 2.0*inch, 3.9*inch]))
 
@@ -178,7 +178,7 @@ story += bullets([
     "Trained entirely on <b>synthetic data</b> - no real malware samples used",
     "<b>Windows-only</b> (Win32 ctypes calls, VAD walking requires Windows kernel structures)",
     "Suspend/resume requires sufficient process privileges (non-admin cannot suspend SYSTEM processes)",
-    "The WebSocket demo (server.py) generates <b>synthetic telemetry</b> for UI testing, not real memory reads",
+    "server.py is retired as a live server: it survives only as a <b>mock fixture</b> under tests/mocks/ for testing, while all WebSocket streaming (live alerts and memory_map broadcasts) runs in app.py",
     "Snapshot semantics: a single scan can miss transient beacons",
 ])
 

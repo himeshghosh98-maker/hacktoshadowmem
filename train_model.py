@@ -47,6 +47,7 @@ from sklearn.metrics import (
 )
 from sklearn.inspection import permutation_importance
 
+from core.config import settings
 from technique_docs import SUBCLASS_ORDER, NUM_CLASSES, MALICIOUS_OFFSET
 
 warnings.filterwarnings("ignore", category=UserWarning)
@@ -602,7 +603,7 @@ def main():
 
     print(f"\nModel output: {NUM_CLASSES}-class classifier, classes={SUBCLASS_ORDER}")
 
-    output_path = "shadowmem_model.pkl"
+    output_path = settings.model_path
     with open(output_path, "wb") as f:
         pickle.dump(final_pipeline, f)
 

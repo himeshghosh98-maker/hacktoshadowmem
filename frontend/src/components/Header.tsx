@@ -147,7 +147,7 @@ export function Header({ isScanning }: HeaderProps) {
             }`}
           />
           <span className="text-textBright font-semibold tracking-wider text-[10px]">
-            {!isConnected ? "GUARD OFFLINE" : "REAL-TIME GUARD"}
+            {!isConnected ? "SCANNER OFFLINE" : "ON-DEMAND SCAN"}
           </span>
         </div>
 
@@ -159,7 +159,7 @@ export function Header({ isScanning }: HeaderProps) {
             {!isConnected
               ? "Disconnected"
               : isScanning
-              ? "Scanning VADs..."
+              ? "Scanning memory..."
               : "Nominal"}
           </span>
         </div>

@@ -14,6 +14,15 @@ import { ProcessDossierModal } from "@/components/dashboard/ProcessDossierModal"
 
 type MapFilter = "ALL" | "THREAT" | "JIT" | "CLEAN";
 
+function matchesMapFilter(p: ProcessEntry, filter: MapFilter): boolean {
+  if (filter === "THREAT") {
+    return p.status === "Malicious (Injected)" || p.status === "Suspicious";
+  }
+  if (filter === "JIT") return p.jit_engine;
+  if (filter === "CLEAN") return p.status === "Clean";
+  return true;
+}
+
 interface MapNode {
   process: ProcessEntry;
   angle: number;
@@ -94,14 +103,7 @@ export default function LiveMapPage() {
     const canvas = canvasRef.current;
     if (!canvas) return;
 
-    const filtered = processes.filter((p) => {
-      if (activeFilter === "THREAT") {
-        return p.status === "Malicious (Injected)" || p.status === "Suspicious";
-      }
-      if (activeFilter === "JIT") return p.jit_engine;
-      if (activeFilter === "CLEAN") return p.status === "Clean (Uninfected)";
-      return true;
-    });
+    const filtered = processes.filter((p) => matchesMapFilter(p, activeFilter));
 
     const rect = canvas.getBoundingClientRect();
     const cssW = rect.width || 800;
@@ -187,10 +189,10 @@ export default function LiveMapPage() {
 
       // 2. Concentric Forensic Rings
       const rings = [
-        { r: 0.28, label: "RING 0: IN-MEMORY THREATS" },
-        { r: 0.48, label: "RING 1: SUSPICIOUS VAD FLIPS" },
-        { r: 0.70, label: "RING 2: JIT RUNTIMES" },
-        { r: 0.92, label: "RING 3: BENIGN USER-MODE" },
+        { r: 0.28, label: "TIER 0: IN-MEMORY THREATS" },
+        { r: 0.48, label: "TIER 1: SUSPICIOUS PROTECTION FLIPS" },
+        { r: 0.70, label: "TIER 2: JIT RUNTIMES" },
+        { r: 0.92, label: "TIER 3: BENIGN USER-MODE" },
       ];
 
       rings.forEach((ring) => {
@@ -246,7 +248,7 @@ export default function LiveMapPage() {
         ctx.restore();
       }
 
-      // 5. Central Ring-0 Kernel Anchor
+      // 5. Central System Origin Anchor
       ctx.fillStyle = "#E8793C";
       ctx.beginPath();
       ctx.arc(cx, cy, 5, 0, Math.PI * 2);
@@ -259,7 +261,7 @@ export default function LiveMapPage() {
       ctx.fillStyle = "#1A1A1A";
       ctx.font = "bold 9px monospace";
       ctx.textAlign = "left";
-      ctx.fillText("RING-0 KERNEL", cx + 14, cy + 3);
+      ctx.fillText("SYSTEM ORIGIN", cx + 14, cy + 3);
 
       // 6. Draw Process Nodes
       const nodes = nodesRef.current;
@@ -397,7 +399,10 @@ export default function LiveMapPage() {
     (p) => p.status === "Malicious (Injected)" || p.status === "Suspicious"
   ).length;
   const jitCount = processes.filter((p) => p.jit_engine).length;
-  const cleanCount = processes.filter((p) => p.status === "Clean (Uninfected)").length;
+  const cleanCount = processes.filter((p) => p.status === "Clean").length;
+  // Derived from state (not nodesRef) so the counter is correct on the render
+  // that follows a scan, before the polar-layout effect runs.
+  const projectedCount = processes.filter((p) => matchesMapFilter(p, activeFilter)).length;
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto pb-10">
@@ -414,7 +419,7 @@ export default function LiveMapPage() {
             </span>
           </div>
           <p className="text-sm font-normal text-textFog mt-1.5 font-sans leading-relaxed">
-            Spatial 2D projection of user-mode processes categorized across Ring-0 memory defense tiers.
+            Spatial 2D projection of user-mode processes categorized across volatile memory defense tiers.
           </p>
         </div>
 
@@ -611,7 +616,7 @@ export default function LiveMapPage() {
           </div>
 
           <div className="text-textDim text-[11px] self-end md:self-auto">
-            {nodesRef.current.length} processes projected in scope
+            {projectedCount} processes projected in scope
           </div>
         </div>
       </div>

@@ -40,10 +40,10 @@ export function StatCards({
             title: "Injections Flagged",
             border: "border-l-threat-suspicious",
             icon: Zap,
-            desc: "VAD heuristic monitoring ready",
+            desc: "Memory anomaly monitoring ready",
           },
           {
-            title: "Avg Scan Time",
+            title: "Last Scan Duration",
             border: "border-l-lime",
             icon: Clock,
             desc: "Engine waiting to benchmark",
@@ -79,6 +79,10 @@ export function StatCards({
     );
   }
 
+  const perProcessMs = summary.total_scanned > 0
+    ? (avgScanTimeMs / summary.total_scanned).toFixed(1)
+    : "0.0";
+
   const cards = [
     {
       title: "Scanned Processes",
@@ -99,7 +103,7 @@ export function StatCards({
       valueColor: summary.malicious_count > 0 ? "text-threat-malicious" : "text-textBright",
       trend: summary.malicious_count > 0 ? "Threat containment required" : "Zero active threats",
       trendType: summary.malicious_count > 0 ? "danger" : "safe",
-      subtext: summary.malicious_count > 0 ? "User-mode suspend recommended" : "No malicious hooks",
+      subtext: summary.malicious_count > 0 ? "User-mode suspend recommended" : "No malicious allocations",
     },
     {
       title: "Injections Flagged",
@@ -110,18 +114,18 @@ export function StatCards({
       valueColor: summary.anomalies_detected > 0 ? "text-threat-suspicious" : "text-textBright",
       trend: `${summary.suspicious_count} suspicious / ${summary.jit_engine_count} JIT ignored`,
       trendType: "neutral",
-      subtext: "VAD protection flips & unbacked exec",
+      subtext: "Protection flips & unbacked exec",
     },
     {
-      title: "Avg Scan Time",
+      title: "Last Scan Duration",
       value: `${avgScanTimeMs}`,
       unit: "ms",
       border: "border-l-lime",
       icon: Clock,
       valueColor: "text-lime",
-      trend: "Volatile forensics speed",
+      trend: "Total scan duration",
       trendType: "safe",
-      subtext: "~2.1ms per process inspection",
+      subtext: `~${perProcessMs}ms avg per process`,
     },
   ];
 

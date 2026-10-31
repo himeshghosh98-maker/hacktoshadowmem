@@ -137,7 +137,7 @@ export default function ProcessTablePage() {
         if (activeTab === "MALICIOUS" && p.status !== "Malicious (Injected)") return false;
         if (activeTab === "SUSPICIOUS" && p.status !== "Suspicious") return false;
         if (activeTab === "JIT" && !p.jit_engine) return false;
-        if (activeTab === "CLEAN" && p.status !== "Clean (Uninfected)") return false;
+        if (activeTab === "CLEAN" && p.status !== "Clean") return false;
 
         // Search query filter
         if (searchQuery.trim()) {
@@ -265,7 +265,7 @@ export default function ProcessTablePage() {
   const countSuspicious = processes.filter((p) => p.status === "Suspicious").length;
   const countJit = processes.filter((p) => p.jit_engine).length;
   const countClean = processes.filter(
-    (p) => p.status === "Clean (Uninfected)"
+    (p) => p.status === "Clean"
   ).length;
 
   return (

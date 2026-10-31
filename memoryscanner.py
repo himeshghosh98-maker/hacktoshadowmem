@@ -2,6 +2,8 @@ import ctypes
 from ctypes import wintypes
 import psutil
 
+from core.config import settings
+
 # ---------------------------------------------------------------------------
 # Win32 constants
 # ---------------------------------------------------------------------------
@@ -19,6 +21,20 @@ MEM_PRIVATE = 0x20000
 
 # Protections that make a region executable (RWX, RX, or copy-on-write exec)
 _EXEC_PROTECTIONS = {PAGE_EXECUTE_READ, PAGE_EXECUTE_READWRITE, PAGE_EXECUTE_WRITECOPY}
+
+# Human-readable names for serialising region details (memory_map frames).
+_PROTECTION_NAMES = {
+    PAGE_READWRITE: "PAGE_READWRITE",
+    PAGE_EXECUTE_READ: "PAGE_EXECUTE_READ",
+    PAGE_EXECUTE_READWRITE: "PAGE_EXECUTE_READWRITE",
+    PAGE_EXECUTE_WRITECOPY: "PAGE_EXECUTE_WRITECOPY",
+}
+
+# Cap on the per-process unbacked-region detail list (memory_map payload);
+# counts are always exact — only the address detail is capped. Bound to the
+# centralized setting so the scanner can never diverge from the memory_map
+# serializer in services/alerts.py, which slices to the same limit.
+_MAX_REGION_DETAILS = settings.max_region_details
 
 # ntdll THREADINFOCLASS: ThreadQuerySetWin32StartAddress
 ThreadQuerySetWin32StartAddress = 9
@@ -97,6 +113,7 @@ def inspect_process(pid: int) -> dict:
         "num_threads": 0,
         "thread_unbacked_start": 0,
         "vad_protection_anomaly": 0,
+        "unbacked_regions": [],
         "error": None,
     }
 
@@ -129,6 +146,15 @@ def inspect_process(pid: int) -> dict:
                 protect = mbi.Protect
                 if protect in _EXEC_PROTECTIONS:
                     features["unbacked_exec_count"] += 1
+                    if len(features["unbacked_regions"]) < _MAX_REGION_DETAILS:
+                        features["unbacked_regions"].append({
+                            "base_address": int(mbi.BaseAddress or address),
+                            "size": int(region_size),
+                            "protection": _PROTECTION_NAMES.get(protect, f"0x{protect:X}"),
+                            "allocation_protect": _PROTECTION_NAMES.get(
+                                mbi.AllocationProtect, f"0x{mbi.AllocationProtect:X}"
+                            ),
+                        })
                     if protect == PAGE_EXECUTE_READWRITE:
                         features["rwx_count"] += 1
                         features["total_rwx_bytes"] += region_size

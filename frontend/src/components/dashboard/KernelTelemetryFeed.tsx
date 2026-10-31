@@ -46,11 +46,8 @@ export function KernelTelemetryFeed({
         <div className="flex items-center gap-2">
           <Terminal className="w-4 h-4 text-lime" />
           <h3 className="text-sm font-semibold text-textBright tracking-tight">
-            Live Kernel Telemetry Feed
+            Scan Activity Feed
           </h3>
-          <span className="text-xs font-sans text-textDim hidden sm:inline">
-            (Ring-0 Hooks & Forensic Thread Watcher)
-          </span>
         </div>
 
         {/* Controls */}
@@ -113,7 +110,7 @@ export function KernelTelemetryFeed({
       >
         {logs.length === 0 ? (
           <div className="h-full flex items-center justify-center text-textDim text-xs font-mono">
-            Log stream buffer empty. Awaiting kernel telemetry...
+            Log stream buffer empty. Awaiting scan activity...
           </div>
         ) : (
           logs.map((item) => (
@@ -141,7 +138,7 @@ export function KernelTelemetryFeed({
               isPaused ? "bg-threat-suspicious" : "bg-lime animate-pulse"
             }`}
           />
-          STREAM: {isPaused ? "PAUSED" : "ACTIVE (3.8s POLLING INTERVAL)"}
+          FEED: {isPaused ? "PAUSED" : "ACTIVE"}
         </span>
         <span>BUFFER: {logs.length} / 120 ENTRIES</span>
       </div>

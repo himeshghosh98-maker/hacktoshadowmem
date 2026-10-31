@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { Play, RotateCcw, Loader2, AlertCircle, Radio } from "lucide-react";
 import {
   ProcessEntry,
@@ -13,7 +13,6 @@ import {
   isolateProcess,
   resumeProcess,
   fetchAudit,
-  connectAlertsWebSocket,
 } from "@/lib/api";
 import { StatCards } from "@/components/dashboard/StatCards";
 import { LiveProcessMapPanel } from "@/components/dashboard/LiveProcessMapPanel";
@@ -23,9 +22,11 @@ import { AnalyticsRow } from "@/components/dashboard/AnalyticsRow";
 import { KernelTelemetryFeed } from "@/components/dashboard/KernelTelemetryFeed";
 import { ProcessDossierModal } from "@/components/dashboard/ProcessDossierModal";
 import { useNotifications } from "@/context/NotificationsContext";
+import { useConnection } from "@/context/ConnectionContext";
 
 export default function OverviewPage() {
   const { addAlert, alerts, clearAlerts } = useNotifications();
+  const { wsConnected, subscribeAlerts } = useConnection();
   const [hasScanned, setHasScanned] = useState(false);
   const [isScanning, setIsScanning] = useState(false);
   const [scanError, setScanError] = useState<string | null>(null);
@@ -35,34 +36,11 @@ export default function OverviewPage() {
   const [processes, setProcesses] = useState<ProcessEntry[]>([]);
   const [isolatedPids, setIsolatedPids] = useState<Set<number>>(new Set());
   const [scanHistory, setScanHistory] = useState<ScanHistoryRecord[]>([]);
-  const [kernelLogs, setKernelLogs] = useState<KernelLogItem[]>([
-    {
-      id: "init-1",
-      tag: "KERNEL",
-      msg: "VAD memory auditing filter driver initialized in Ring-0.",
-      level: "success",
-      timestamp: new Date().toISOString().substring(11, 19),
-    },
-    {
-      id: "init-2",
-      tag: "SYS",
-      msg: "NtQueryVirtualMemory hooks bound. Standing by for volatile scan.",
-      level: "info",
-      timestamp: new Date().toISOString().substring(11, 19),
-    },
-    {
-      id: "init-3",
-      tag: "ML",
-      msg: "7-Feature forensic pipeline loaded: random forest classifier ready.",
-      level: "purple",
-      timestamp: new Date().toISOString().substring(11, 19),
-    },
-  ]);
+  const [kernelLogs, setKernelLogs] = useState<KernelLogItem[]>([]);
 
   const [isTickerPaused, setIsTickerPaused] = useState(false);
   const [selectedProcess, setSelectedProcess] = useState<ProcessEntry | null>(null);
   const [isIsolating, setIsIsolating] = useState(false);
-  const [wsConnected, setWsConnected] = useState(false);
 
   // Freshness timestamps for data-bearing cards
   const [lastScanTime, setLastScanTime] = useState<number | null>(null);
@@ -114,72 +92,29 @@ export default function OverviewPage() {
         // Backend not yet available or in mock mode
       });
 
-    // WebSocket real-time alerts connection
-    const disconnectWs = connectAlertsWebSocket(
-      (wsAlert) => {
-        addAlert(wsAlert);
-        setLastAlertTime(Date.now());
-        appendLog(
-          "KERNEL",
-          `[WS ALERT] ${wsAlert.title}: ${wsAlert.message}`,
-          wsAlert.severity === "critical" ? "danger" : "warning"
-        );
-      },
-      (connected) => {
-        setWsConnected(connected);
-      }
-    );
+    // Subscribe to consolidated WebSocket alerts feed from ConnectionContext
+    const unsubscribe = subscribeAlerts((wsAlert) => {
+      addAlert(wsAlert);
+      setLastAlertTime(Date.now());
+      appendLog(
+        "SYS",
+        `[WS ALERT] ${wsAlert.title}: ${wsAlert.message}`,
+        wsAlert.severity === "critical" ? "danger" : "warning"
+      );
+    });
 
     return () => {
-      disconnectWs();
+      unsubscribe();
     };
-  }, [appendLog, addAlert]);
+  }, [appendLog, addAlert, subscribeAlerts]);
 
-  // 2. Ambient background telemetry ticker (matching original dashboard behavior)
-  const isTickerPausedRef = useRef(isTickerPaused);
-  isTickerPausedRef.current = isTickerPaused;
-
-  useEffect(() => {
-    const ambientMsgs = [
-      {
-        tag: "KERNEL" as const,
-        msg: "Walking active thread list via PsGetProcessThreads...",
-        level: "info" as const,
-      },
-      {
-        tag: "VAD" as const,
-        msg: "Validating memory page protection masks against system DEP policies.",
-        level: "info" as const,
-      },
-      {
-        tag: "SYS" as const,
-        msg: "Telemetry heartbeat verified with SOC command center.",
-        level: "success" as const,
-      },
-      {
-        tag: "MONITOR" as const,
-        msg: "Polling unbacked executable heap allocation delta: +0 KB.",
-        level: "info" as const,
-      },
-    ];
-
-    const timer = setInterval(() => {
-      if (isTickerPausedRef.current) return;
-      if (Math.random() > 0.45) return;
-      const pick = ambientMsgs[Math.floor(Math.random() * ambientMsgs.length)];
-      appendLog(pick.tag, pick.msg, pick.level);
-    }, 4000);
-
-    return () => clearInterval(timer);
-  }, [appendLog]);
-
-  // 3. Real memory scan execution via GET /api/scan
+  // 2. Real memory scan execution via GET /api/v1/scan
   const handleExecuteScan = async () => {
     setIsScanning(true);
     setScanError(null);
     appendLog(
-      "KERNEL",
-      "Initiating volatile memory audit across user-mode processes...",
+      "SCAN",
+      "Initiating memory audit across user-mode processes...",
       "info"
     );
 
@@ -222,8 +157,8 @@ export default function OverviewPage() {
       setScanHistory((prev) => [...prev, newHistoryRecord]);
 
       appendLog(
-        "KERNEL",
-        `Volatile memory audit complete: ${data.summary.total_scanned} processes inspected in ${elapsed}ms. (${data.summary.anomalies_detected} anomalies)`,
+        "SCAN",
+        `Memory audit complete: ${data.summary.total_scanned} processes inspected in ${elapsed}ms. (${data.summary.anomalies_detected} anomalies)`,
         data.summary.anomalies_detected > 0 ? "warning" : "success"
       );
 
@@ -243,7 +178,7 @@ export default function OverviewPage() {
             message: `PID ${p.pid} scored ${p.threat_score.toFixed(1)}% threat confidence. ${
               p.classification?.name
                 ? `Technique: ${p.classification.name}.`
-                : "VAD protection anomalies detected."
+                : "Protection anomalies detected."
             }`,
             severity: isMal ? "critical" : "warn",
             timestamp: nowLabel,
@@ -252,11 +187,22 @@ export default function OverviewPage() {
           });
           setLastAlertTime(Date.now());
         });
+
+      if (data.summary.anomalies_detected === 0) {
+        addAlert({
+          id: `scan-clean-${Date.now()}`,
+          title: "Memory Audit Clean",
+          message: `Scan completed: ${data.summary.total_scanned} processes inspected. Zero threats detected.`,
+          severity: "ok",
+          timestamp: nowLabel,
+        });
+        setLastAlertTime(Date.now());
+      }
     } catch (err: unknown) {
       const errMsg =
         err instanceof Error ? err.message : "Failed to execute memory scan.";
       setScanError(errMsg);
-      appendLog("KERNEL", `Scan failed: ${errMsg}`, "danger");
+      appendLog("SCAN", `Scan failed: ${errMsg}`, "danger");
     } finally {
       setIsScanning(false);
     }
@@ -383,7 +329,7 @@ export default function OverviewPage() {
             )}
           </div>
           <p className="text-sm font-normal text-textFog mt-1.5 font-sans leading-relaxed">
-            Automated volatile memory forensics, VAD heuristics & ML fileless malware detection.
+            Automated memory-region forensics and injection detection
           </p>
         </div>
 

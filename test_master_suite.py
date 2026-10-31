@@ -80,12 +80,14 @@ if not sandbox_ok:
 # ---------------------------------------------------------------------------
 log_phase("Phase 2: Live Server API & UI Health Verification")
 code, html_bytes = http_get("/")
-check("Dashboard Root HTML (GET /)", code == 200 and len(html_bytes) > 50000, f"{len(html_bytes)} bytes served")
+check("Dashboard Root HTML (GET /)", code == 200 and len(html_bytes) > 1000, f"{len(html_bytes)} bytes served")
 
+# GET / serves the built Next.js dashboard (frontend/out), not the legacy
+# standalone index.html, so assert on what the server actually returns.
 html_text = html_bytes.decode("utf-8", "ignore")
-check("Dark Theme Palette (#060A13)", "#060A13" in html_text, "Surface hierarchy active")
-check("Single let isolatedPids Declaration", html_text.count("let isolatedPids") == 1, "Duplicate bug resolved")
-check("Interactive Scan Button Handler", "scanBtn.addEventListener" in html_text, "Event listener bound")
+check("Dashboard Title Served", "Cyber Defense Operations Center" in html_text, "SOC dashboard shell")
+check("Next Static Export Served", "/_next/static/" in html_text, "Built dashboard bundle referenced")
+check("Dashboard Navigation Rendered", "Live Map" in html_text, "Next app nav present")
 
 
 # ---------------------------------------------------------------------------
@@ -210,23 +212,35 @@ async def test_websocket_broadcast():
         welcome = await asyncio.wait_for(ws.recv(), timeout=5.0)
         received_messages.append(json.loads(welcome))
         
-        # Trigger an alert broadcast via HTTP POST
-        code, sim_bytes = http_post("/simulate/alert")
+        # Trigger an alert broadcast via HTTP POST (scenario + severity required)
+        code, sim_bytes = http_post(
+            "/simulate/alert",
+            {"scenario": "cobalt_strike_reflective_injection", "severity": "critical"},
+        )
         sim_data = json.loads(sim_bytes.decode("utf-8"))
         
-        # Receive the broadcasted alert
-        alert = await asyncio.wait_for(ws.recv(), timeout=5.0)
-        received_messages.append(json.loads(alert))
+        # Frames may interleave (memory_map is sent on connect, and the scan
+        # ticker broadcasts its own alerts), so read until the simulate
+        # broadcast itself arrives rather than assuming it is frame #2.
+        target_id = sim_data.get("alert_id")
+        for _ in range(10):
+            frame = await asyncio.wait_for(ws.recv(), timeout=5.0)
+            received_messages.append(json.loads(frame))
+            if received_messages[-1].get("event_id") == target_id:
+                break
         
         return sim_data, received_messages
 
 try:
     sim_data, ws_msgs = asyncio.run(test_websocket_broadcast())
     welcome_msg = ws_msgs[0]
-    broadcast_msg = ws_msgs[1]
+    broadcast_msg = next(
+        (m for m in ws_msgs if m.get("event_id") == sim_data.get("alert_id")),
+        None,
+    )
     check("WebSocket Handshake & Welcome", welcome_msg.get("type") == "alert", "Link established")
-    check("WebSocket Alert Broadcast", broadcast_msg.get("event_id") == sim_data.get("alert_id"), 
-          f"Broadcast event {broadcast_msg.get('event_id')[:8]}... received")
+    check("WebSocket Alert Broadcast", broadcast_msg is not None,
+          f"Broadcast event {(broadcast_msg or {}).get('event_id', 'MISSING')[:8]}... received")
     check("Alert Payload Technique Metadata", "Reflective Code Loading" in str(broadcast_msg), "MITRE info present")
 except Exception as e:
     check("WebSocket Broadcast", False, str(e))

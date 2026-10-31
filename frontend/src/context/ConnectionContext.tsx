@@ -2,30 +2,45 @@
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from "react";
 import { connectAlertsWebSocket } from "@/lib/api";
+import { AlertItem } from "@/types/forensics";
 
 export interface ConnectionContextType {
   isConnected: boolean;
   isReconnected: boolean;
+  wsConnected: boolean;
   lastConnectedTime: number | null;
   reportSuccess: () => void;
   reportFailure: (err?: unknown) => void;
+  subscribeAlerts: (callback: (alert: AlertItem) => void) => () => void;
 }
 
 const ConnectionContext = createContext<ConnectionContextType>({
   isConnected: true,
   isReconnected: false,
+  wsConnected: false,
   lastConnectedTime: null,
   reportSuccess: () => {},
   reportFailure: () => {},
+  subscribeAlerts: () => () => {},
 });
 
 export function ConnectionProvider({ children }: { children: React.ReactNode }) {
   const [isConnected, setIsConnected] = useState<boolean>(true);
   const [isReconnected, setIsReconnected] = useState<boolean>(false);
+  const [wsConnected, setWsConnected] = useState<boolean>(false);
   const [lastConnectedTime, setLastConnectedTime] = useState<number | null>(null);
 
   const isConnectedRef = useRef(isConnected);
   isConnectedRef.current = isConnected;
+
+  const alertSubscribersRef = useRef<Set<(alert: AlertItem) => void>>(new Set());
+
+  const subscribeAlerts = useCallback((callback: (alert: AlertItem) => void) => {
+    alertSubscribersRef.current.add(callback);
+    return () => {
+      alertSubscribersRef.current.delete(callback);
+    };
+  }, []);
 
   const reconnectedTimerRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -78,7 +93,7 @@ export function ConnectionProvider({ children }: { children: React.ReactNode }) 
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 2000);
 
-        const res = await fetch("/api/audit", {
+        const res = await fetch("/api/v1/audit", {
           method: "GET",
           headers: { Accept: "application/json" },
           cache: "no-store",
@@ -102,10 +117,19 @@ export function ConnectionProvider({ children }: { children: React.ReactNode }) 
     // Check interval: every 3 seconds
     const interval = setInterval(probe, 3000);
 
-    // Also attach to WebSocket connection status
+    // Sole owner of the active WebSocket connection
     const disconnectWs = connectAlertsWebSocket(
-      () => {},
+      (alert) => {
+        alertSubscribersRef.current.forEach((cb) => {
+          try {
+            cb(alert);
+          } catch (e) {
+            console.error("Error in alert subscriber:", e);
+          }
+        });
+      },
       (connected) => {
+        setWsConnected(connected);
         if (connected) {
           reportSuccess();
         } else {
@@ -128,9 +152,11 @@ export function ConnectionProvider({ children }: { children: React.ReactNode }) 
       value={{
         isConnected,
         isReconnected,
+        wsConnected,
         lastConnectedTime,
         reportSuccess,
         reportFailure,
+        subscribeAlerts,
       }}
     >
       {children}

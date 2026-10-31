@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -11,7 +11,6 @@ import {
   ShieldAlert,
   Terminal,
   ShieldCheck,
-  UserCheck,
 } from "lucide-react";
 
 interface NavItem {
@@ -27,11 +26,29 @@ const navItems: NavItem[] = [
   { name: "Process Table", href: "/process-table", icon: Cpu },
   { name: "Analytics", href: "/analytics", icon: BarChart3 },
   { name: "Alerts", href: "/alerts", icon: ShieldAlert },
-  { name: "Kernel Log", href: "/kernel-log", icon: Terminal },
+  { name: "Activity Log", href: "/kernel-log", icon: Terminal },
 ];
 
 export function Sidebar() {
   const pathname = usePathname();
+  const [lastScanTime, setLastScanTime] = useState<string>("none");
+
+  useEffect(() => {
+    const handleScan = (e: Event) => {
+      const customEvent = e as CustomEvent<{ timestamp?: number }>;
+      if (customEvent.detail?.timestamp) {
+        setLastScanTime(
+          new Date(customEvent.detail.timestamp).toLocaleTimeString([], {
+            hour: "2-digit",
+            minute: "2-digit",
+            second: "2-digit",
+          })
+        );
+      }
+    };
+    window.addEventListener("shadowmem:scan", handleScan);
+    return () => window.removeEventListener("shadowmem:scan", handleScan);
+  }, []);
 
   return (
     <aside className="w-64 h-screen bg-card border-r border-border flex flex-col shrink-0 select-none z-30">
@@ -95,40 +112,23 @@ export function Sidebar() {
         })}
       </nav>
 
-      {/* System Telemetry Pill */}
-      <div className="px-3 py-2">
+      {/* Engine Box */}
+      <div className="px-3 py-3">
         <div className="p-3 rounded-lg bg-card border border-border space-y-2">
-          <div className="flex items-center justify-between text-xs font-mono">
-            <span className="text-textDim font-medium">Filter Driver</span>
-            <span className="flex items-center gap-1.5 text-lime font-bold">
-              <span className="w-1.5 h-1.5 rounded-full bg-lime animate-pulse" />
-              Active
-            </span>
+          <div className="text-[10px] font-mono font-semibold uppercase tracking-wider text-textDim">
+            Engine
           </div>
           <div className="flex items-center justify-between text-xs font-mono">
-            <span className="text-textDim font-medium">VAD Monitor</span>
-            <span className="text-textBright font-semibold">Ring-0 Hook</span>
+            <span className="text-textDim font-medium">Mode</span>
+            <span className="text-textBright font-semibold text-[11px]">user-mode (VirtualQueryEx)</span>
+          </div>
+          <div className="flex items-center justify-between text-xs font-mono">
+            <span className="text-textDim font-medium">Model</span>
+            <span className="text-textBright font-semibold text-[11px]">HistGradientBoosting</span>
           </div>
           <div className="pt-1.5 border-t border-border/60 flex items-center justify-between text-[11px] font-mono text-textDim">
-            <span>Model: 7-Feature ML</span>
-            <span className="text-lime font-bold">Ready</span>
-          </div>
-        </div>
-      </div>
-
-      {/* User / Analyst Profile Footer */}
-      <div className="p-3 border-t border-border bg-[#F8F5F0]">
-        <div className="flex items-center gap-3 px-2 py-1.5 rounded-md hover:bg-raise/60 transition-colors">
-          <div className="w-8 h-8 rounded-full bg-[#EBE5DF] flex items-center justify-center border border-borderMuted">
-            <UserCheck className="w-4 h-4 text-lime" />
-          </div>
-          <div className="min-w-0 flex-1">
-            <div className="text-xs font-bold text-textBright truncate font-sans">
-              SOC Tier-3 Analyst
-            </div>
-            <div className="text-[10px] font-mono text-textDim truncate font-medium">
-              ID: ANALYST-092
-            </div>
+            <span>Last scan:</span>
+            <span className="text-lime font-bold">{lastScanTime}</span>
           </div>
         </div>
       </div>

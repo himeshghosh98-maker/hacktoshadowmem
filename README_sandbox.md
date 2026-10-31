@@ -335,7 +335,7 @@ REFRESH_INTERVAL = 5.0  # Seconds between re-registration
 | app.py | FastAPI backend + dashboard frontend |
 | technique_docs.py | Technique classification documentation |
 | shadowmem_model.pkl | Trained ML model for detection |
-| server.py | WebSocket alert server (alternative) |
+| tests/mocks/server.py | Legacy mock WebSocket server (isolated UI testing) |
 
 ---
 

@@ -27,14 +27,14 @@ export function LiveProcessMapPanel({
     (p) => p.status === "Malicious (Injected)" || p.status === "Suspicious"
   ).length;
   const jitCount = processes.filter((p) => p.jit_engine).length;
-  const cleanCount = processes.filter((p) => p.status === "Clean (Uninfected)").length;
+  const cleanCount = processes.filter((p) => p.status === "Clean").length;
 
   const filteredProcesses = processes.filter((p) => {
     if (activeTab === "THREAT") {
       return p.status === "Malicious (Injected)" || p.status === "Suspicious";
     }
     if (activeTab === "JIT") return p.jit_engine;
-    if (activeTab === "CLEAN") return p.status === "Clean (Uninfected)";
+    if (activeTab === "CLEAN") return p.status === "Clean";
     return true;
   });
 

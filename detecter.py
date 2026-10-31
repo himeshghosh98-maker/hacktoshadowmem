@@ -3,41 +3,20 @@ import pickle
 import numpy as np
 import memoryscanner
 
+from core.config import settings
 from technique_docs import SUBCLASS_ORDER, NUM_CLASSES, MALICIOUS_OFFSET, TECHNIQUE_DOCS
 
-MODEL_PATH = "shadowmem_model.pkl"
-
-# Legitimate JIT engines allocating RWX / unbacked memory
-JIT_ENGINE_ALLOWLIST = {
-    "chrome.exe",
-    "msedge.exe",
-    "firefox.exe",
-    "code.exe",
-    "discord.exe",
-    "antigravity.exe",
-    "slack.exe",
-    "teams.exe",
-    "electron.exe",
-    "brave.exe",
-    "opera.exe",
-    "vivaldi.exe",
-}
-
-JIT_SCORE_CAP = 25
-
-# Managed .NET runtimes. Name AND path must both match: malware frequently
-# renames itself powershell.exe/dotnet.exe, so only system-installed hosts
-# (under C:\Windows) are suppressed. Everything else gets fully scored.
-MANAGED_RUNTIME_NAMES = {"powershell.exe", "pwsh.exe", "dotnet.exe"}
-MANAGED_RUNTIME_PATH_PREFIXES = ("c:\\windows\\",)
+# All engine knobs (model path, JIT allowlist, thresholds, score cap) come from
+# the centralized configuration so this CLI honours .env / SHADOWMEM_* overrides.
+MODEL_PATH = settings.model_path
 
 
 def is_benign_managed_runtime(name: str, exe_path: str) -> bool:
     """True only for system-installed .NET hosts (name + path must both match)."""
-    if name.lower().strip() not in MANAGED_RUNTIME_NAMES:
+    if name.lower().strip() not in settings.managed_runtime_names:
         return False
     exe = (exe_path or "").lower().replace("/", "\\")
-    return exe.startswith(MANAGED_RUNTIME_PATH_PREFIXES)
+    return exe.startswith(settings.managed_runtime_path_prefixes)
 
 def load_threat_model():
     """Loads the pre-trained Scikit-Learn Pipeline."""
@@ -76,7 +55,7 @@ def run_detection():
         thr_unbacked = int(proc.get("thread_unbacked_start", 0) or 0)
         vad_anomaly = int(proc.get("vad_protection_anomaly", 0) or 0)
 
-        is_jit = 1.0 if (pname in JIT_ENGINE_ALLOWLIST
+        is_jit = 1.0 if (pname in settings.jit_engine_allowlist
                          or is_benign_managed_runtime(name, exe_path)) else 0.0
 
         # Feature order matches train_model.py FEATURE_NAMES:
@@ -105,13 +84,13 @@ def run_detection():
 
         # Apply JIT allowlist suppression
         if is_jit:
-            threat_score = min(threat_score, JIT_SCORE_CAP)
+            threat_score = int(min(threat_score, settings.jit_score_cap))
             verdict = "[~] LEGITIMATE JIT"
             top_technique = None
-        elif threat_score >= 70:
+        elif threat_score >= settings.threshold_malicious:
             verdict = "[!] MALICIOUS"
             threat_count += 1
-        elif threat_score >= 35:
+        elif threat_score >= settings.threshold_suspicious:
             verdict = "[?] SUSPICIOUS"
             threat_count += 1
         else:
@@ -124,7 +103,7 @@ def run_detection():
             tech_tag = f"  [{TECHNIQUE_DOCS[top_technique]['display_name']}]"
 
         # Display any non-clean or allowlisted JIT processes
-        if threat_score >= 35 or is_jit:
+        if threat_score >= settings.threshold_suspicious or is_jit:
             print(f"{proc['pid']:<8} {name[:24]:<25} {rwx:<6} {unbacked:<10} {threat_score}%{'':<10} {verdict}{tech_tag}")
 
     if threat_count == 0:

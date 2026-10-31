@@ -26,9 +26,13 @@ Message types sent over the socket:
   - "memory_map"  -> a simplified virtual memory layout for the visualizer
   - "alert"       -> a detection event (benign heartbeat or simulated attack)
 
-Run (standalone, for index.html testing only):
+Run (from tests/mocks/, standalone, for index.html testing only):
     pip install fastapi uvicorn --break-system-packages
-    uvicorn server:app --reload --port 8000
+    uvicorn server:app --reload --port 8082
+
+The bind port comes from the centralized configuration (core/config.py):
+SHADOWMEM_MOCK_PORT (default 8082) keeps this mock distinct from the
+authoritative app.py server on SHADOWMEM_PORT (default 8000).
 
 Test manually:
     python trigger_test_event.py
@@ -37,10 +41,20 @@ Test manually:
 import asyncio
 import json
 import random
+import sys
 import time
 import uuid
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import List
+
+# This fixture lives under tests/mocks/, so put the repository root on sys.path
+# to read the same centralized configuration the real server uses.
+_REPO_ROOT = Path(__file__).resolve().parents[2]
+if str(_REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(_REPO_ROOT))
+
+from core.config import settings
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
@@ -287,4 +301,4 @@ async def websocket_alerts(websocket: WebSocket):
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    uvicorn.run(app, host="0.0.0.0", port=settings.mock_port)

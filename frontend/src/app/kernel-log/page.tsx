@@ -12,58 +12,22 @@ import {
   Radio,
 } from "lucide-react";
 import { KernelLogItem } from "@/types/forensics";
-import { connectAlertsWebSocket } from "@/lib/api";
 import { useDensity } from "@/context/DensityContext";
+import { useConnection } from "@/context/ConnectionContext";
 import LastUpdated from "@/components/LastUpdated";
 
 type LogLevelFilter = "ALL" | "info" | "success" | "warning" | "danger";
 
 export default function KernelLogPage() {
   const { isCompact } = useDensity();
+  const { wsConnected, subscribeAlerts } = useConnection();
   const [lastUpdated, setLastUpdated] = useState<Date | null>(new Date());
-  const [logs, setLogs] = useState<KernelLogItem[]>([
-    {
-      id: "init-1",
-      tag: "KERNEL",
-      msg: "VAD memory auditing filter driver initialized in Ring-0.",
-      level: "success",
-      timestamp: new Date().toISOString().substring(11, 19),
-    },
-    {
-      id: "init-2",
-      tag: "SYS",
-      msg: "NtQueryVirtualMemory handles bound to PsGetProcessThreads iterator.",
-      level: "info",
-      timestamp: new Date().toISOString().substring(11, 19),
-    },
-    {
-      id: "init-3",
-      tag: "ML",
-      msg: "7-Feature forensic pipeline loaded: random forest classifier active.",
-      level: "purple",
-      timestamp: new Date().toISOString().substring(11, 19),
-    },
-    {
-      id: "init-4",
-      tag: "VAD",
-      msg: "Validating memory page protection masks against system DEP policies.",
-      level: "info",
-      timestamp: new Date().toISOString().substring(11, 19),
-    },
-    {
-      id: "init-5",
-      tag: "MONITOR",
-      msg: "Memory Commit threshold verified: nominal user-mode headroom.",
-      level: "info",
-      timestamp: new Date().toISOString().substring(11, 19),
-    },
-  ]);
+  const [logs, setLogs] = useState<KernelLogItem[]>([]);
 
   const [isPaused, setIsPaused] = useState(false);
   const [autoScroll, setAutoScroll] = useState(true);
   const [levelFilter, setLevelFilter] = useState<LogLevelFilter>("ALL");
   const [searchQuery, setSearchQuery] = useState("");
-  const [wsConnected, setWsConnected] = useState(false);
 
   const containerRef = useRef<HTMLDivElement>(null);
   const isPausedRef = useRef(isPaused);
@@ -100,68 +64,18 @@ export default function KernelLogPage() {
     }
   }, [logs, autoScroll, isPaused]);
 
-  // Ambient Telemetry Generator
+  // Subscribe to consolidated WebSocket alerts from ConnectionContext
   useEffect(() => {
-    const ambientMsgs = [
-      {
-        tag: "KERNEL" as const,
-        msg: "Walking active thread list via PsGetProcessThreads...",
-        level: "info" as const,
-      },
-      {
-        tag: "VAD" as const,
-        msg: "Validating memory page protection masks against DEP policies.",
-        level: "info" as const,
-      },
-      {
-        tag: "SYS" as const,
-        msg: "Telemetry heartbeat verified with SOC command center.",
-        level: "success" as const,
-      },
-      {
-        tag: "MEM" as const,
-        msg: "Polling unbacked executable heap allocation delta: +0 KB.",
-        level: "info" as const,
-      },
-      {
-        tag: "MONITOR" as const,
-        msg: "Scanning non-image executable allocations across active working sets.",
-        level: "info" as const,
-      },
-      {
-        tag: "KERNEL" as const,
-        msg: "NtQueryVirtualMemory handles flushed: 0 memory leaks observed.",
-        level: "success" as const,
-      },
-    ];
+    const unsubscribe = subscribeAlerts((wsAlert) => {
+      appendLog(
+        "SYS",
+        `[REMOTE EVENT] ${wsAlert.title}: ${wsAlert.message}`,
+        wsAlert.severity === "critical" ? "danger" : "warning"
+      );
+    });
 
-    const timer = setInterval(() => {
-      if (isPausedRef.current) return;
-      if (Math.random() > 0.45) return;
-      const pick = ambientMsgs[Math.floor(Math.random() * ambientMsgs.length)];
-      appendLog(pick.tag as KernelLogItem["tag"], pick.msg, pick.level);
-    }, 3800);
-
-    return () => clearInterval(timer);
-  }, [appendLog]);
-
-  // WebSocket Live alerts listener
-  useEffect(() => {
-    const disconnect = connectAlertsWebSocket(
-      (wsAlert) => {
-        appendLog(
-          "KERNEL",
-          `[REMOTE EVENT] ${wsAlert.title}: ${wsAlert.message}`,
-          wsAlert.severity === "critical" ? "danger" : "warning"
-        );
-      },
-      (connected) => {
-        setWsConnected(connected);
-      }
-    );
-
-    return () => disconnect();
-  }, [appendLog]);
+    return () => unsubscribe();
+  }, [appendLog, subscribeAlerts]);
 
   // Export logs to .log text file
   const handleExportLog = () => {
@@ -173,7 +87,7 @@ export default function KernelLogPage() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `shadowmem_kernel_telemetry_${new Date().toISOString().slice(0, 19)}.log`;
+    a.download = `shadowmem_activity_${new Date().toISOString().slice(0, 19)}.log`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -207,11 +121,11 @@ export default function KernelLogPage() {
           <div className="flex items-center gap-2.5">
             <Terminal className="w-5 h-5 text-lime" />
             <h2 className="text-2xl sm:text-[26px] font-bold tracking-tight text-textBright">
-              Live Kernel Telemetry & Audit Stream
+              Live Activity Log & Audit Stream
             </h2>
             <div className="flex items-center gap-1.5 px-2.5 py-0.5 rounded text-[10px] font-mono font-bold tracking-wider bg-lime/15 text-lime border border-lime/30">
               <span className="w-1.5 h-1.5 rounded-full bg-lime animate-pulse" />
-              <span>RING-0 HOOKS</span>
+              <span>USER-MODE ENGINE</span>
             </div>
             {wsConnected && (
               <span className="hidden sm:inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-mono font-semibold tracking-wider bg-blue-500/10 text-blue-500 border border-blue-500/20">
@@ -221,7 +135,7 @@ export default function KernelLogPage() {
             )}
           </div>
           <p className="text-sm font-normal text-textFog mt-1.5 font-sans leading-relaxed">
-            Direct output stream of VAD page validations, NtQueryVirtualMemory probes, thread walkthroughs & Ring-0 driver events.
+            Direct output stream of memory page validations, thread walkthroughs, and forensic scan events.
           </p>
         </div>
 
@@ -319,7 +233,7 @@ export default function KernelLogPage() {
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search kernel log message..."
+              placeholder="Search activity log message..."
               className="w-full bg-[#FAF7F2] text-xs text-textBright placeholder:text-textDim pl-9 pr-4 py-1.5 rounded-md border border-border focus:outline-none focus:border-lime/60 focus:ring-1 focus:ring-lime/40 transition-all font-mono"
             />
           </div>
@@ -336,7 +250,7 @@ export default function KernelLogPage() {
               }`}
             />
             <span>
-              STATUS: {isPaused ? "PAUSED" : "ACTIVE MONITORING (3.8s CADENCE)"}
+              STATUS: {isPaused ? "PAUSED" : "ACTIVE"}
             </span>
           </span>
           <div className="flex items-center gap-3">

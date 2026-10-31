@@ -2,7 +2,7 @@ export type ProcessStatus =
   | "Malicious (Injected)"
   | "Suspicious"
   | "Legitimate JIT Engine"
-  | "Clean (Uninfected)";
+  | "Clean";
 
 export interface ProcessClassification {
   id: string;
@@ -64,7 +64,7 @@ export interface AlertItem {
 
 export interface KernelLogItem {
   id: string;
-  tag: "KERNEL" | "SYS" | "ML" | "MONITOR" | "VAD" | "TERMINAL" | "ISOLATE";
+  tag: "KERNEL" | "SYS" | "ML" | "MONITOR" | "VAD" | "TERMINAL" | "ISOLATE" | "SCAN";
   msg: string;
   level: "info" | "success" | "warning" | "danger" | "purple";
   timestamp: string;
