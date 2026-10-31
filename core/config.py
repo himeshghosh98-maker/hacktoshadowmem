@@ -101,7 +101,12 @@ class Settings(BaseSettings):
     reload: bool = Field(False, description="Enable auto-reload for development")
     api_prefix: str = Field("/api/v1", description="Prefix for versioned API endpoints")
     cors_origins: Annotated[List[str], NoDecode] = Field(
-        default_factory=lambda: ["*"], description="Allowed CORS origins"
+        default_factory=lambda: [
+            "http://localhost:3000",
+            "http://127.0.0.1:3000",
+            "http://127.0.0.1:8000",
+        ],
+        description="Allowed CORS origins",
     )
     frontend_dir: Path = Field(
         default_factory=lambda: Path(__file__).resolve().parent.parent / "frontend" / "out",

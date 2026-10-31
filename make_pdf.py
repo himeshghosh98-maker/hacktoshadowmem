@@ -408,7 +408,7 @@ story += bullets([
     "sortable-by-score process table, per-process 'Forensic Dossier' modal showing the "
     "7-vector breakdown, SOC recommendation, MITRE tag (T1055/T1620), and Isolate/Dump/"
     "Export buttons.",
-    "Extras: RING-0 telemetry ticker with pause/clear, JSON report export button, toast "
+    "Extras: user-mode telemetry ticker (real VirtualQueryEx scan events) with pause/clear, JSON report export button, toast "
     "notifications, error banner for scan failures (503 when memoryscanner missing, 500 when "
     "a scan raises).",
     "Honesty note: the modal's 'Extracted In-Memory Strings and Hex Preview' drawer shows a "
@@ -497,7 +497,7 @@ todo_rows = [
      "process names before rendering (currently trusted into the DOM); add rate limiting and "
      "an explicit admin-privilege check with a friendly error."],
     ["P2", "K. Roadmap items from the guide",
-     "Linux eBPF port, Windows kernel driver (WDM) for zero-latency trapping, DL on carved "
+     "Linux eBPF port, lower-latency user-mode trapping (SuspendThread), DL on carved "
      "memory streams - explicitly future scope, not session work."],
 ]
 story.append(make_table(
