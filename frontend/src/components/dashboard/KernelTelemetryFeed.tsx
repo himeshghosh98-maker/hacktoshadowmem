@@ -35,14 +35,14 @@ export function KernelTelemetryFeed({
     if (level === "danger") return "text-threat-malicious font-bold";
     if (level === "warning") return "text-threat-suspicious font-bold";
     if (level === "success") return "text-lime font-bold";
-    if (level === "purple") return "text-indigo-400 font-bold";
+    if (level === "purple") return "text-indigo-500 font-bold";
     return "text-threat-jit font-bold";
   };
 
   return (
-    <div className={`${isCompact ? "p-3.5 space-y-2" : "p-5 space-y-3"} rounded-lg bg-card border border-border shadow-sm`}>
+    <div className={`${isCompact ? "p-3.5 space-y-2" : "p-5 space-y-3"} rounded-lg bg-card border border-border shadow-xs`}>
       {/* Header */}
-      <div className={`flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${isCompact ? "pb-2" : "pb-3"} border-b border-border/80`}>
+      <div className={`flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${isCompact ? "pb-2" : "pb-3"} border-b border-border`}>
         <div className="flex items-center gap-2">
           <Terminal className="w-4 h-4 text-lime" />
           <h3 className="text-sm font-semibold text-textBright tracking-tight">
@@ -56,10 +56,10 @@ export function KernelTelemetryFeed({
           {/* Pause / Resume button */}
           <button
             onClick={onTogglePause}
-            className={`flex items-center gap-1.5 px-2.5 py-1 rounded text-xs font-mono font-medium transition-all ${
+            className={`flex items-center gap-1.5 px-2.5 py-1 rounded text-xs font-mono font-medium transition-colors ${
               isPaused
-                ? "bg-threat-suspicious/20 text-threat-suspicious border border-threat-suspicious/40"
-                : "bg-raise text-textFog hover:text-textBright border border-border"
+                ? "bg-threat-suspicious/15 text-threat-suspicious border border-threat-suspicious/30"
+                : "bg-background text-textFog hover:text-textBright border border-border"
             }`}
           >
             {isPaused ? (
@@ -78,10 +78,10 @@ export function KernelTelemetryFeed({
           {/* Auto-scroll toggle */}
           <button
             onClick={() => setAutoScroll(!autoScroll)}
-            className={`flex items-center gap-1 px-2 py-1 rounded text-xs font-mono font-medium border transition-all ${
+            className={`flex items-center gap-1 px-2.5 py-1 rounded text-xs font-mono font-medium border transition-colors ${
               autoScroll
                 ? "bg-lime/10 text-lime border-lime/30"
-                : "bg-raise text-textDim border-border"
+                : "bg-background text-textDim border-border"
             }`}
             title="Toggle Auto-Scroll"
           >
@@ -92,7 +92,7 @@ export function KernelTelemetryFeed({
           {/* Clear button */}
           <button
             onClick={onClear}
-            className="flex items-center gap-1 px-2 py-1 rounded text-xs font-mono font-medium text-textDim hover:text-textBright bg-raise border border-border transition-colors"
+            className="flex items-center gap-1 px-2.5 py-1 rounded text-xs font-mono font-medium text-textDim hover:text-textBright bg-background border border-border transition-colors"
             title="Clear Log Terminal"
           >
             <Trash2 className="w-3 h-3" />
@@ -106,7 +106,7 @@ export function KernelTelemetryFeed({
         ref={containerRef}
         className={`${
           isCompact ? "h-36 p-2.5 space-y-0.5" : "h-48 p-3.5 space-y-1.5"
-        } overflow-y-auto rounded-lg bg-[#F8F5F0] border border-border font-mono text-xs scroll-smooth`}
+        } overflow-y-auto rounded-lg bg-background border border-border font-mono text-xs scroll-smooth`}
       >
         {logs.length === 0 ? (
           <div className="h-full flex items-center justify-center text-textDim text-xs font-mono">
@@ -116,9 +116,9 @@ export function KernelTelemetryFeed({
           logs.map((item) => (
             <div
               key={item.id}
-              className={`flex items-baseline ${isCompact ? "gap-2 leading-snug" : "gap-2.5 leading-relaxed"} hover:bg-[#EFE9E1] px-1 rounded transition-colors`}
+              className={`flex items-baseline ${isCompact ? "gap-2 leading-snug" : "gap-2.5 leading-relaxed"} hover:bg-raise/50 px-1 rounded transition-colors`}
             >
-              <span className="text-textDim select-none shrink-0 tnum text-[11px] font-medium">
+              <span className="text-textDim select-none shrink-0 text-xs font-medium">
                 [{item.timestamp}]
               </span>
               <span className={`shrink-0 ${getTagColor(item.tag, item.level)}`}>
@@ -135,7 +135,7 @@ export function KernelTelemetryFeed({
         <span className="flex items-center gap-2">
           <span
             className={`w-1.5 h-1.5 rounded-full ${
-              isPaused ? "bg-threat-suspicious" : "bg-lime animate-pulse"
+              isPaused ? "bg-threat-suspicious" : "bg-lime"
             }`}
           />
           FEED: {isPaused ? "PAUSED" : "ACTIVE"}

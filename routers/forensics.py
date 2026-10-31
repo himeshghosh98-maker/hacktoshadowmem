@@ -1,18 +1,21 @@
 """
 routers/forensics.py
 ====================
-API routes for volatile memory forensic scanning and threat posture analysis.
-Provides /api/v1/scan and legacy /api/scan endpoint.
+API routes for volatile memory forensic scanning, threat posture analysis,
+and live memory buffer hex extraction.
+Provides /api/v1/scan, /api/v1/memory/dump, and legacy /api/* endpoints.
 """
 
+from typing import Optional
 from fastapi import APIRouter, BackgroundTasks, HTTPException
 from fastapi.responses import JSONResponse
 
-from schemas.forensics import ScanResponse
+from schemas.forensics import ScanResponse, MemoryDumpResponse
 from services.forensics import (
     get_scan_lock,
     perform_scan_and_diff_locked,
     load_model,
+    get_memory_dump,
 )
 from services.alerts import broadcast_scan_updates
 from core.logging import logger
@@ -70,3 +73,39 @@ def api_scan(background_tasks: BackgroundTasks) -> JSONResponse:
         },
         "processes": evaluated,
     })
+
+
+@router.get(
+    "/memory/dump/{pid}",
+    response_model=MemoryDumpResponse,
+    summary="Inspect process memory buffer",
+    description="Extracts and formats the first unbacked executable memory slice for a target process with Shannon entropy and hex disassembly.",
+)
+@compat_router.get(
+    "/api/memory/dump/{pid}",
+    response_model=MemoryDumpResponse,
+    summary="Inspect process memory buffer (compat)",
+    description="Legacy unversioned memory buffer dump endpoint.",
+)
+def api_memory_dump(pid: int) -> JSONResponse:
+    """Extract memory dump for PID."""
+    dump_data = get_memory_dump(pid)
+    return JSONResponse(dump_data)
+
+
+@router.get(
+    "/memory/dump/{pid}/{address}",
+    response_model=MemoryDumpResponse,
+    summary="Inspect specific memory address buffer",
+    description="Extracts and formats memory slice at a specific base address for a target process.",
+)
+@compat_router.get(
+    "/api/memory/dump/{pid}/{address}",
+    response_model=MemoryDumpResponse,
+    summary="Inspect specific memory address buffer (compat)",
+    description="Legacy unversioned memory buffer dump endpoint for specific address.",
+)
+def api_memory_dump_address(pid: int, address: str) -> JSONResponse:
+    """Extract memory dump for PID and specific address."""
+    dump_data = get_memory_dump(pid, address)
+    return JSONResponse(dump_data)

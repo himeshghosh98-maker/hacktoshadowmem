@@ -1,6 +1,7 @@
 import {
   ScanResponse,
   AlertItem,
+  MemoryDumpResponse,
 } from "@/types/forensics";
 
 export interface IsolateResponse {
@@ -40,8 +41,6 @@ export interface WebSocketAlertPayload {
 
 const getApiBaseUrl = (): string => {
   if (typeof window === "undefined") return "http://127.0.0.1:8000";
-  // In development (port 3000), relative /api requests are proxied by next.config.mjs
-  // In production (served from app.py on port 8000), relative /api requests hit app.py directly
   return "";
 };
 
@@ -176,6 +175,33 @@ export async function fetchAudit(): Promise<AuditResponse> {
   }
 }
 
+export async function fetchMemoryDump(
+  pid: number,
+  address?: string
+): Promise<MemoryDumpResponse> {
+  const base = getApiBaseUrl();
+  const endpoint = address
+    ? `${base}/api/v1/memory/dump/${pid}/${encodeURIComponent(address)}`
+    : `${base}/api/v1/memory/dump/${pid}`;
+  try {
+    const res = await fetch(endpoint, {
+      method: "GET",
+      headers: {
+        Accept: "application/json",
+      },
+    });
+
+    if (!res.ok) {
+      throw new Error(`Memory dump inspection failed: HTTP ${res.status}`);
+    }
+
+    return (await res.json()) as MemoryDumpResponse;
+  } catch (err) {
+    console.error("fetchMemoryDump error:", err);
+    throw err;
+  }
+}
+
 export async function simulateAlert(
   scenario: string = "cobalt_strike_reflective_injection",
   severity: "critical" | "warn" | "info" = "critical"
@@ -225,8 +251,6 @@ export function connectAlertsWebSocket(
 
     try {
       const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-      // If dev server is on port 3000, connect to backend at 127.0.0.1:8000
-      // If served from 8000, connect to current host
       const host =
         window.location.port === "3000"
           ? "127.0.0.1:8000"
@@ -245,8 +269,6 @@ export function connectAlertsWebSocket(
         if (isUnmounted) return;
         try {
           const payload = JSON.parse(event.data) as WebSocketAlertPayload;
-          // Only alert frames belong in the alerts feed. memory_map frames
-          // (live-map payload) and other frame types must not surface here.
           if (payload.type && payload.type !== "alert") return;
           const isCritical = payload.severity === "critical" || payload.detection?.is_malicious;
           const alertItem: AlertItem = {
