@@ -18,31 +18,45 @@ from services.forensics import get_cached_processes
 # ---- Win32 Constants & Function Signatures ---------------------------------
 INVALID_HANDLE_VALUE = -1
 
-_K32 = ctypes.WinDLL("kernel32", use_last_error=True)
+import os
+import psutil
 
-_OPEN_PROCESS = _K32.OpenProcess
-_OPEN_PROCESS.argtypes = (wintypes.DWORD, wintypes.BOOL, wintypes.DWORD)
-_OPEN_PROCESS.restype = wintypes.HANDLE
+IS_WINDOWS = hasattr(ctypes, "WinDLL") and os.name == "nt"
 
-_OPEN_THREAD = _K32.OpenThread
-_OPEN_THREAD.argtypes = (wintypes.DWORD, wintypes.BOOL, wintypes.DWORD)
-_OPEN_THREAD.restype = wintypes.HANDLE
+if IS_WINDOWS:
+    _K32 = ctypes.WinDLL("kernel32", use_last_error=True)
 
-_SUSPEND_THREAD = _K32.SuspendThread
-_SUSPEND_THREAD.argtypes = (wintypes.HANDLE,)
-_SUSPEND_THREAD.restype = wintypes.DWORD
+    _OPEN_PROCESS = _K32.OpenProcess
+    _OPEN_PROCESS.argtypes = (wintypes.DWORD, wintypes.BOOL, wintypes.DWORD)
+    _OPEN_PROCESS.restype = wintypes.HANDLE
 
-_RESUME_THREAD = _K32.ResumeThread
-_RESUME_THREAD.argtypes = (wintypes.HANDLE,)
-_RESUME_THREAD.restype = wintypes.DWORD
+    _OPEN_THREAD = _K32.OpenThread
+    _OPEN_THREAD.argtypes = (wintypes.DWORD, wintypes.BOOL, wintypes.DWORD)
+    _OPEN_THREAD.restype = wintypes.HANDLE
 
-_GET_EXIT_CODE_THREAD = _K32.GetExitCodeThread
-_GET_EXIT_CODE_THREAD.argtypes = (wintypes.HANDLE, ctypes.POINTER(wintypes.DWORD))
-_GET_EXIT_CODE_THREAD.restype = wintypes.BOOL
+    _SUSPEND_THREAD = _K32.SuspendThread
+    _SUSPEND_THREAD.argtypes = (wintypes.HANDLE,)
+    _SUSPEND_THREAD.restype = wintypes.DWORD
 
-_CLOSE_HANDLE = _K32.CloseHandle
-_CLOSE_HANDLE.argtypes = (wintypes.HANDLE,)
-_CLOSE_HANDLE.restype = wintypes.BOOL
+    _RESUME_THREAD = _K32.ResumeThread
+    _RESUME_THREAD.argtypes = (wintypes.HANDLE,)
+    _RESUME_THREAD.restype = wintypes.DWORD
+
+    _GET_EXIT_CODE_THREAD = _K32.GetExitCodeThread
+    _GET_EXIT_CODE_THREAD.argtypes = (wintypes.HANDLE, ctypes.POINTER(wintypes.DWORD))
+    _GET_EXIT_CODE_THREAD.restype = wintypes.BOOL
+
+    _CLOSE_HANDLE = _K32.CloseHandle
+    _CLOSE_HANDLE.argtypes = (wintypes.HANDLE,)
+    _CLOSE_HANDLE.restype = wintypes.BOOL
+else:
+    _K32 = None
+    _OPEN_PROCESS = None
+    _OPEN_THREAD = None
+    _SUSPEND_THREAD = None
+    _RESUME_THREAD = None
+    _GET_EXIT_CODE_THREAD = None
+    _CLOSE_HANDLE = None
 
 PROCESS_SUSPEND_RESUME = 0x0800
 THREAD_SUSPEND_RESUME = 0x02
@@ -136,6 +150,26 @@ def isolate_process(pid: int, reason: str = "") -> Tuple[int, Dict[str, Any]]:
         msg = f"Refusing to isolate {repr(name)} (PID {pid}): this is a protected system process. Suspending it can destabilize or crash Windows."
         record_audit(pid, name, "isolate", False, msg)
         return 403, {"success": False, "error": msg, "action": "suspended"}
+
+    if not IS_WINDOWS or _OPEN_PROCESS is None:
+        try:
+            p = psutil.Process(pid)
+            p.suspend()
+            msg = f"Isolated {repr(name)} (PID {pid}): process suspended via POSIX signal."
+            record_audit(pid, name, "isolate", True, msg)
+            return 200, {
+                "pid": pid,
+                "name": name,
+                "action": "suspended",
+                "success": True,
+                "error": None,
+                "suspended_count": 1,
+                "failed_count": 0,
+            }
+        except Exception as e:
+            msg = f"Failed to isolate {repr(name)} (PID {pid}): {e}"
+            record_audit(pid, name, "isolate", False, msg)
+            return 500, {"success": False, "error": msg, "action": "suspended"}
 
     handle = None
     handles = []
@@ -251,6 +285,46 @@ def resume_process(pid: int) -> Tuple[int, Dict[str, Any]]:
         return 400, {"success": False, "error": "Invalid PID.", "action": "resumed"}
 
     name = _lookup_process_name(pid)
+    if not IS_WINDOWS or _OPEN_PROCESS is None:
+        try:
+            p = psutil.Process(pid)
+            p.suspend()
+            msg = f"Isolated {repr(name)} (PID {pid}): process suspended via POSIX signal."
+            record_audit(pid, name, "isolate", True, msg)
+            return 200, {
+                "pid": pid,
+                "name": name,
+                "action": "suspended",
+                "success": True,
+                "error": None,
+                "suspended_count": 1,
+                "failed_count": 0,
+            }
+        except Exception as e:
+            msg = f"Failed to isolate {repr(name)} (PID {pid}): {e}"
+            record_audit(pid, name, "isolate", False, msg)
+            return 500, {"success": False, "error": msg, "action": "suspended"}
+
+    if not IS_WINDOWS or _OPEN_PROCESS is None:
+        try:
+            p = psutil.Process(pid)
+            p.resume()
+            msg = f"Resumed {repr(name)} (PID {pid}) via POSIX signal."
+            record_audit(pid, name, "resume", True, msg)
+            return 200, {
+                "pid": pid,
+                "name": name,
+                "action": "resumed",
+                "success": True,
+                "error": None,
+                "resumed_count": 1,
+                "failed_count": 0,
+            }
+        except Exception as e:
+            msg = f"Failed to resume {repr(name)} (PID {pid}): {e}"
+            record_audit(pid, name, "resume", False, msg)
+            return 500, {"success": False, "error": msg, "action": "resumed"}
+
     handle = None
     handles = []
     try:

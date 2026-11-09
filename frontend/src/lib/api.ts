@@ -40,6 +40,9 @@ export interface WebSocketAlertPayload {
 }
 
 const getApiBaseUrl = (): string => {
+  if (process.env.NEXT_PUBLIC_API_URL) {
+    return process.env.NEXT_PUBLIC_API_URL.replace(/\/$/, "");
+  }
   if (typeof window === "undefined") return "http://127.0.0.1:8000";
   return "";
 };
@@ -250,13 +253,25 @@ export function connectAlertsWebSocket(
     if (isUnmounted) return;
 
     try {
-      const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-      const host =
-        window.location.port === "3000"
-          ? "127.0.0.1:8000"
-          : window.location.host || "127.0.0.1:8000";
-
-      const wsUrl = `${protocol}//${host}/api/v1/ws/alerts`;
+      let wsUrl: string;
+      if (process.env.NEXT_PUBLIC_WS_URL) {
+        wsUrl = `${process.env.NEXT_PUBLIC_WS_URL.replace(/\/$/, "")}/api/v1/ws/alerts`;
+      } else if (process.env.NEXT_PUBLIC_API_URL) {
+        const apiHttp = process.env.NEXT_PUBLIC_API_URL.replace(/\/$/, "");
+        const wsPrefix = apiHttp.startsWith("https://")
+          ? "wss://" + apiHttp.slice(8)
+          : apiHttp.startsWith("http://")
+          ? "ws://" + apiHttp.slice(7)
+          : `ws://${apiHttp}`;
+        wsUrl = `${wsPrefix}/api/v1/ws/alerts`;
+      } else {
+        const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+        const host =
+          window.location.port === "3000"
+            ? "127.0.0.1:8000"
+            : window.location.host || "127.0.0.1:8000";
+        wsUrl = `${protocol}//${host}/api/v1/ws/alerts`;
+      }
       ws = new WebSocket(wsUrl);
 
       ws.onopen = () => {

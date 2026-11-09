@@ -55,37 +55,43 @@ class MEMORY_BASIC_INFORMATION(ctypes.Structure):
         ("Type", wintypes.DWORD),
     ]
 
-kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
-ntdll = ctypes.WinDLL("ntdll", use_last_error=True)
+IS_WINDOWS = hasattr(ctypes, "WinDLL") and os.name == "nt"
 
-kernel32.OpenProcess.restype = wintypes.HANDLE
-kernel32.OpenProcess.argtypes = [wintypes.DWORD, wintypes.BOOL, wintypes.DWORD]
+if IS_WINDOWS:
+    kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+    ntdll = ctypes.WinDLL("ntdll", use_last_error=True)
 
-kernel32.OpenThread.restype = ctypes.c_void_p
-kernel32.OpenThread.argtypes = [wintypes.DWORD, wintypes.BOOL, wintypes.DWORD]
+    kernel32.OpenProcess.restype = wintypes.HANDLE
+    kernel32.OpenProcess.argtypes = [wintypes.DWORD, wintypes.BOOL, wintypes.DWORD]
 
-kernel32.VirtualQueryEx.restype = ctypes.c_size_t
-kernel32.VirtualQueryEx.argtypes = [
-    wintypes.HANDLE, ctypes.c_void_p, ctypes.POINTER(MEMORY_BASIC_INFORMATION), ctypes.c_size_t
-]
+    kernel32.OpenThread.restype = ctypes.c_void_p
+    kernel32.OpenThread.argtypes = [wintypes.DWORD, wintypes.BOOL, wintypes.DWORD]
 
-kernel32.CloseHandle.restype = wintypes.BOOL
-kernel32.CloseHandle.argtypes = [wintypes.HANDLE]
+    kernel32.VirtualQueryEx.restype = ctypes.c_size_t
+    kernel32.VirtualQueryEx.argtypes = [
+        wintypes.HANDLE, ctypes.c_void_p, ctypes.POINTER(MEMORY_BASIC_INFORMATION), ctypes.c_size_t
+    ]
 
-kernel32.ReadProcessMemory.restype = wintypes.BOOL
-kernel32.ReadProcessMemory.argtypes = [
-    wintypes.HANDLE,
-    ctypes.c_void_p,
-    ctypes.c_void_p,
-    ctypes.c_size_t,
-    ctypes.POINTER(ctypes.c_size_t),
-]
+    kernel32.CloseHandle.restype = wintypes.BOOL
+    kernel32.CloseHandle.argtypes = [wintypes.HANDLE]
 
-ntdll.NtQueryInformationThread.restype = ctypes.c_long  # NTSTATUS
-ntdll.NtQueryInformationThread.argtypes = [
-    ctypes.c_void_p, ctypes.c_long, ctypes.c_void_p,
-    ctypes.c_ulong, ctypes.POINTER(ctypes.c_ulong),
-]
+    kernel32.ReadProcessMemory.restype = wintypes.BOOL
+    kernel32.ReadProcessMemory.argtypes = [
+        wintypes.HANDLE,
+        ctypes.c_void_p,
+        ctypes.c_void_p,
+        ctypes.c_size_t,
+        ctypes.POINTER(ctypes.c_size_t),
+    ]
+
+    ntdll.NtQueryInformationThread.restype = ctypes.c_long  # NTSTATUS
+    ntdll.NtQueryInformationThread.argtypes = [
+        ctypes.c_void_p, ctypes.c_long, ctypes.c_void_p,
+        ctypes.c_ulong, ctypes.POINTER(ctypes.c_ulong),
+    ]
+else:
+    kernel32 = None
+    ntdll = None
 
 
 def _query_region(h_process, address):
@@ -115,6 +121,8 @@ def _get_thread_start_address(thread_handle):
 
 def read_process_memory_slice(pid: int, address: int, size: int = 256) -> bytes:
     """Safely reads a slice of virtual memory from target process. Returns raw bytes."""
+    if not IS_WINDOWS or kernel32 is None:
+        return b""
     h_process = kernel32.OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, False, pid)
     if not h_process:
         return b""
@@ -160,6 +168,10 @@ def inspect_process(pid: int) -> dict:
         features["num_threads"] = proc.num_threads()
     except (psutil.NoSuchProcess, psutil.AccessDenied, Exception):
         features["error"] = "Access Denied"
+        return features
+
+    if not IS_WINDOWS or kernel32 is None:
+        # Cross-platform / cloud fallback: psutil features already extracted
         return features
 
     h_process = kernel32.OpenProcess(PROCESS_QUERY_INFORMATION | PROCESS_VM_READ, False, pid)
